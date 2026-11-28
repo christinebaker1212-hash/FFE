@@ -274,6 +274,8 @@ TRANS_BANK = 123                        # the encounter transition's tables (tra
 CODE10 = 124                            # Extras: the Sound Test, the Bestiary (extras.s)
 CODE11 = 125                            # the menus' UI library and the rebuilt menus (ui.s, mm.s)
 CODE12 = 126                            # the menus' long strings (place names, FF3's messages: ui.py)
+CODE13 = 127                            # more rebuilt screens on a copy of the UI (build.py ui13)
+CODE13_MODULES = ('shp', 'nme')
 CODE11_MODULES = ('ui', 'mm', 'eqm', 'itm', 'mgm', 'sight', 'sts', 'jbm', 'svm', 'cfg', 'bst')
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
@@ -281,6 +283,32 @@ CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
 BTXT_BANK = 97                          # battle strings ($0400-$07FF): index + strings, banks 97-
 CODE1 = 80
+
+
+def ui13(rom, rd, split, rams):
+    """bank CODE13: the screens of CODE13_MODULES on their own copy of the menus' UI library (ui.s's
+    code and its data, every ROM label renamed with __13; its RAM, equates and CODE12's strings
+    shared), so they call it within their bank"""
+    import ui
+    full = ui.code_data(rom, rgb555, group_world, CODE11, CODE12)
+    head, _, rest = full.partition('section bank %d, $7FD0' % CODE11)
+    aligned = rest.split('section bank')[0]
+    code, _ = split(rd('ui'))
+    code = '\n'.join(l for l in code.split('\n') if not re.match(r'^\s*[A-Za-z_]\w*\s*=', l))
+    names = set(re.findall(r'^([A-Za-z_]\w*):', code + '\n' + head + '\n' + aligned, re.M))
+    pat = re.compile(r'(?<![\w.])([A-Za-z_]\w*)\b')
+    ren = lambda t: pat.sub(lambda m: m.group(1) + '__13' if m.group(1) in names else m.group(1), t)
+    out = ['section bank %d, $4000' % CODE13, ren(code).replace('CODE11', 'CODE13'), ren(head)]
+    for m in CODE13_MODULES:
+        c, r = split(rd(m))
+        out.append(ren(c))
+        rams.append(r)
+    import shop, title
+    out.append(shop.ui_data(rom))
+    out.append(title.ne_data(rom))
+    out.append('section bank %d, $7FD0' % CODE13)
+    out.append(ren(aligned))
+    return '\n'.join(out)
 
 
 def engine_src(rom=None):
@@ -368,6 +396,8 @@ def engine_src(rom=None):
     if rom is not None:
         import ui
         codes.append(ui.code_data(rom, rgb555, group_world, CODE11, CODE12))
+    if rom is not None and CODE13_MODULES:            # CODE13: more screens on a renamed copy of the UI
+        codes.append(ui13(rom, rd, split, rams))
     codes.append('section bank %d, $4000' % CODE10)
     c, r = split(rd('extras'))
     codes.append(c)
@@ -508,7 +538,7 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
-                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, 'CODE8': CODE8, 'CODE9': CODE9, 'TRANS_BANK': TRANS_BANK, 'CODE10': CODE10, 'CODE11': CODE11, 'CODE12': CODE12, 'MAGG': MAGG, 'FXD': FXD, **cut_syms,
+                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, 'CODE8': CODE8, 'CODE9': CODE9, 'TRANS_BANK': TRANS_BANK, 'CODE10': CODE10, 'CODE11': CODE11, 'CODE12': CODE12, 'CODE13': CODE13, 'MAGG': MAGG, 'FXD': FXD, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

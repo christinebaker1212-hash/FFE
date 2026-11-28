@@ -74,3 +74,50 @@ def code_data(rom):
     for k, (_, w) in enumerate(choices(t(0x24))):            # the fat chocobo: Deposit / Withdraw / Exit
         src += db('ch_w%d' % k, text.encode(w) + b'\0')
     return src
+
+
+def ui_data(rom):
+    """the rebuilt shop's words (shp.s, bank CODE13): FF3's messages $26-$2C and $6C (two lines;
+    $2B split at its value), the shop names, the choices (Buy / Sell / Exit, 1 / 4 / 10, 1 / All)"""
+    import ui
+    t = lambda i: text.decode(text.raw_string(rom, 't8200', i))
+    def lines_(raw):
+        return b'\x01'.join(text.encode(ui.clean(x)) for x in raw.split('\n') if ui.clean(x))
+    def lines(raw):
+        return b'\x01'.join(text.encode(ui.clean(x)) for x in raw.split('\n') if ui.clean(x))
+    def strtab(label, items):
+        out = '%s:\n' % label + ''.join('    dw %s_%d\n' % (label, k) for k in range(len(items)))
+        for k, b in enumerate(items):
+            out += '%s_%d:\n    db %s\n' % (label, k, ', '.join(str(v) for v in bytes(b) + b'\0'))
+        return out
+    msgs = [lines(t(i)) for i in (0x26, 0x27, 0x28, 0x29, 0x2A)] + [b'', lines(t(0x2C)), lines(t(0x6C))]
+    v = t(0x2B)
+    a, _, b = v.partition('{04}')
+    src = strtab('SP_MSG', msgs)
+    src += 'SP_V1:\n    db %s\n' % ', '.join(str(x) for x in text.encode(ui.clean(a)) + b'\0')
+    src += 'SP_V2:\n    db %s\n' % ', '.join(str(x) for x in b'\xff' + text.encode(ui.clean(b)) + b'\0')
+    names = [text.encode(' '.join(x.strip() for x in t(7 + k).replace('{0E}', '').split('\n') if x.strip()))
+             for k in range(4)]
+    src += strtab('SP_TITLE', names)
+    yn = [re.sub(r'\{[^}]*\}', '', x).strip() for x in t(0x06).split('\n')]
+    sets = [choices(t(0x0B)), choices(t(0x2D).split('\n')[1]), choices(t(0x2E).split('\n')[1]),
+            [(0, yn[0]), (0, yn[1])]]
+    src += strtab('SP_SETS', [bytes([len(c)]) + b'\0'.join(text.encode(w) for _, w in c) for c in sets])
+    # the inn's speech ($0104): re-wrapped to 144 pixels, its cost (6 digits wide) in one line
+    sp = ui.clean(t(0x04).replace('[77][79]', 'HP').replace('{04}', '#'))
+    lines, cur = [], []
+    w = lambda ws: ui.width(text.encode(' '.join(ws).replace('#', ''))) + (26 if '#' in ws else 0)
+    for wd in sp.split(' '):
+        if cur and w(cur + [wd]) > 144:
+            lines.append(cur); cur = []
+        cur.append(wd)
+    lines.append(cur)
+    assert len(lines) <= 6, lines
+    k = [i for i, l in enumerate(lines) if '#' in l][0]
+    pre, _, suf = ' '.join(lines[k]).partition('#')
+    src += strtab('IN_L', [text.encode(' '.join(l)) if i != k else b'' for i, l in enumerate(lines)])
+    src += 'IN_NK:\n    db %d, %d\n' % (len(lines), k)
+    src += 'IN_PRE:\n    db %s\n' % ', '.join(str(x) for x in text.encode(pre.rstrip()) + b'\xff\0')
+    src += 'IN_SUF:\n    db %s\n' % ', '.join(str(x) for x in b'\xff' + text.encode(suf.strip()) + b'\0')
+    src += strtab('IN_THX', [lines_(t(0x4F))])
+    return src

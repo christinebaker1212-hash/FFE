@@ -327,7 +327,32 @@ sh_sell1:   ld a, [sh_cur]
             ret
 .ok:        ld [sh_id], a
             call sh_ok
-            ld a, [sh_id]
+            call shx_sval0
+            ld a, $2B                       ; That will come to {04} Gil.
+            jp sh_sell2
+; ---- for the rebuilt shop (shp.s, CODE13): sh_cur / sh_q set; u_eres 1 if refused, else 0 and
+; the value in sh_val / t_gil
+shx_sval:   ld a, 1
+            ld [u_eres], a
+            ld a, [sh_cur]
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            and a
+            ret z
+            cp $9A
+            jr c, .ok
+            cp $A4
+            ret c
+            cp $F6
+            ret z
+            cp $F7
+            ret z
+.ok:        ld [sh_id], a
+            xor a
+            ld [u_eres], a
+shx_sval0:  ld a, [sh_id]
             call sh_price                   ; CDE
             ld a, [sh_q]
             and a
@@ -350,8 +375,8 @@ sh_sell1:   ld a, [sh_cur]
             ld a, c
             ld [sh_val + 2], a
             ld [t_gil + 2], a
-            ld a, $2B                       ; That will come to {04} Gil.
-            ld [sh_msg], a
+            ret
+sh_sell2:   ld [sh_msg], a
             call sh_draw
             call cur_hide
 .w:         call sh_frame                   ; A: sell, B: not
@@ -365,7 +390,7 @@ sh_sell1:   ld a, [sh_cur]
             bit 0, a
             ret z
             call sh_ok
-            ld a, [sh_cur]
+shx_sell:   ld a, [sh_cur]                  ; (the sale itself; shp.s too)
             add a, low(GS + $C0)
             ld l, a
             ld h, high(GS + $C0)
@@ -393,6 +418,12 @@ sh_sell1:   ld a, [sh_cur]
             ld a, [sh_val + 2]
             ld c, a
             jp gil_add
+
+shx_prices: jp sh_prices
+shx_buy:    call sh_buy1                    ; (sh_lc, sh_q: sh_msg the outcome)
+            ld a, [sh_msg]
+            ld [u_eres], a
+            ret
 
 ; ---- prices: A = item -> CDE (10/9E00 + 2 id)
 sh_price:   ld l, a
@@ -954,6 +985,91 @@ inn_open:   xor a
 .no:        call sh_ok
 .out:       call cur_hide
             jp sel_close
+
+; ---- for the rebuilt inn (shp.s inn13): the cost (members not dead / stone x 5 x the price) ->
+; sh_val / t_gil; the stay: the gil (u_eres $6C if short), HP to max, the script's event after
+shx_icost:  xor a
+            ld [sh_ev], a
+            ld [sh_val], a
+            ld [sh_val + 1], a
+            ld [sh_val + 2], a
+            ld b, 0
+            ld hl, GS + $102
+.m:         ld a, [hl]
+            and $C0
+            jr nz, .d
+            inc b
+.d:         ld a, l
+            add a, $40
+            ld l, a
+            cp 2
+            jr nz, .m
+            ld a, b
+            add a, a
+            add a, a
+            add a, b
+            ld b, a
+            ld a, [EV_TRIG]
+            ld e, a
+            ld d, 0
+            ld c, 0
+            ld a, b
+            call sh_mul
+            ld a, e
+            ld [sh_val], a
+            ld [t_gil], a
+            ld a, d
+            ld [sh_val + 1], a
+            ld [t_gil + 1], a
+            ld a, c
+            ld [sh_val + 2], a
+            ld [t_gil + 2], a
+            ret
+shx_istay:  call sh_gilok
+            ld a, $6C
+            jr c, .r
+            ld hl, GS + $1C
+            ld a, [sh_val]
+            ld b, a
+            ld a, [hl]
+            sub b
+            ld [hl+], a
+            ld a, [sh_val + 1]
+            ld b, a
+            ld a, [hl]
+            sbc b
+            ld [hl+], a
+            ld a, [sh_val + 2]
+            ld b, a
+            ld a, [hl]
+            sbc b
+            ld [hl], a
+            ld hl, GS + $102
+.h:         ld a, [hl]
+            and $C0
+            jr nz, .hn
+            push hl
+            ld a, l
+            add a, $0C
+            ld l, a
+            ld a, [hl+]
+            ld b, [hl]
+            dec hl
+            dec hl
+            dec hl
+            ld [hl+], a
+            ld [hl], b
+            pop hl
+.hn:        ld a, l
+            add a, $40
+            ld l, a
+            cp 2
+            jr nz, .h
+            ld a, [EV_TRIG + 1]
+            ld [sh_ev], a
+            xor a
+.r:         ld [u_eres], a
+            ret
 
 ; t8200 string E in the inn box (rows 0-5: 4 lines), its pages one by one (A between them); with
 ; the question ($0104) its last page shows Yes / No (rows 6-9) and the gil beside it; Z at the end

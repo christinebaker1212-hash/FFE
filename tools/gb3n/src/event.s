@@ -158,12 +158,14 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
 shop_npc:   ld hl, choc_open                ; ($FC-: the fat chocobo, 3D/B383)
             cp $FC
             jr nc, .f
-            ld hl, shop_open
+            ld hl, shp_open                 ; (shops: rebuilt, shp.s in CODE13)
             cp $E3
-            jr nc, .f
-            ld hl, inn_open
+            jr nc, .f13
+            ld hl, inn13                    ; (inns too: shp.s)
+.f13:       ld a, CODE13
+            jr .fc
 .f:         ld a, CODE1
-            call far_call
+.fc:        call far_call
             ld a, [sh_ev]
             and a
             ret z

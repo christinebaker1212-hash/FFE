@@ -103,3 +103,15 @@ def presets():
         out += 'TL_PN%d:\n' % k + ''.join('    db %s\n' % ', '.join(str(v) for v in b[i:i + 16])
                                           for i in range(0, len(b), 16))
     return out
+
+
+def ne_data(rom):
+    """the rebuilt name entry's letters and hints (nme.s, bank CODE13)"""
+    def db(label, data):
+        return '%s:\n' % label + ''.join('    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
+                                         for k in range(0, len(data), 16))
+    tail = '0123456789' + ".,'-!?&/:"
+    return (db('TL_G0N', text.encode('ABCDEFGHIJKLMNOPQRSTUVWXYZ' + tail)) +
+            db('TL_G1N', text.encode('abcdefghijklmnopqrstuvwxyz' + tail)) +
+            db('TL_H0N', text.encode('SELECT: abc') + b'\0') + db('TL_H1N', text.encode('SELECT: ABC') + b'\0') +
+            db('TL_H2N', text.encode('B: Delete   START: OK') + b'\0'))
