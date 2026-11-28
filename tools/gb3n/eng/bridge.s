@@ -23,6 +23,20 @@ ATTR_FRAME = $0F            ; palette 7, VRAM bank 1
 map_id     = Z + $48
 pos_x      = px
 wm_x       = Z + $27
+PAD_A      = $01            ; the pad bits (read_pad): A B Select Start Right Left Up Down
+PAD_B      = $02
+PAD_SEL    = $04
+PAD_START  = $08
+PAD_RESET  = $0F
+SRAM_PAGE  = SV             ; FF3's save page ($6000)
+SR_GIL     = SV + $1C
+I_WINPAL   = $7CC0          ; (B_MAPINFO: the window's NES colours)
+veh        = Z + $42        ; FF3's vehicle
+pos_y      = py
+wmode      = maptype        ; 1: the world map
+ev_who     = Z + $A0        ; the person talked to (FF3 $A0)
+scr_buf    = TS7B           ; FF3's $7B00 (a shop's items)
+SCRATCH    = $DA00          ; (WRAM bank 1: data staged from ROM banks, 768 bytes)
 SV_KEEP    = $D000          ; (WRAM bank 3: the field's RAM while a battle runs)
 
 section bank 0, $2A00
@@ -190,6 +204,120 @@ pal_black:  ld a, $80                       ; all palettes black (V-Blank)
             ret
 soft_reset: jp sreset
 
+; the field's random number for the menu (m_rnd), FF3's (3E/C711)
+f_rnd_m:    call rnd_fld
+            ld [m_rnd], a
+            ret
+; FF3's gil at most 9,999,999 ($98967F)
+gil_cap:    ld hl, SR_GIL + 2
+            ld a, [hl]
+            cp $98
+            ret c
+            jr nz, .cap
+            dec hl
+            ld a, [hl]
+            cp $96
+            ret c
+            jr nz, .cap
+            dec hl
+            ld a, [hl]
+            cp $80
+            ret c
+.cap:       ld hl, SR_GIL
+            ld a, $7F
+            ld [hl+], a
+            ld a, $96
+            ld [hl+], a
+            ld a, $98
+            ld [hl], a
+            ret
+
+; ---- a full screen of the kept modules (the main menu): the field's RAM kept, their interrupt
+; mode, then the map again (FF3 3F/E356 reload map, 3E/C27C reload world map)
+menu_run:   xor a
+            ld [z23], a
+            ld [z22], a
+            ld [z24], a
+            ld [z25], a
+            ld hl, m_main
+            ld b, B_MENU
+full_run:   push hl
+            push bc
+            call lcd_off
+            call fr_enter
+            pop bc
+            pop hl
+            ld a, b
+            call far_call
+            call lcd_off
+            call fr_leave
+            jp fr_reload
+; the field's RAM into WRAM bank 3, the kept modules' interrupt mode
+fr_enter:   xor a
+            ld [box_on], a
+            ldh a, [rLCDC]
+            res 5, a
+            ldh [rLCDC], a
+            ld a, 3
+            ldh [rSVBK], a
+            ld hl, $C900
+            ld de, SV_KEEP
+            ld bc, $0600
+            call memcpy
+            ld a, 1
+            ldh [rSVBK], a
+            ld hl, C_WINPAL                 ; (BG palette 7 for their windows)
+            ld de, cgb_pal + 64
+            ld bc, 8
+            ld a, COMMON
+            call far_copy
+            ld a, 1
+            ldh [bmode], a
+            xor a
+            ldh [c_split], a
+            ldh [guard_on], a
+            ld a, LCDC_ON | $40
+            ldh [rLCDC], a
+            ret
+; the field's mode and RAM back
+fr_leave:   di
+            xor a
+            ldh [bmode], a
+            ldh [c_split], a
+            ldh [guard_on], a
+            ldh [snd_isr], a
+            ld a, BOX_LINES - 1
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
+            xor a
+            ldh [rSCX], a
+            ldh [rSCY], a
+            ld a, 3
+            ldh [rIE], a
+            ei
+            ld a, 3
+            ldh [rSVBK], a
+            ld hl, SV_KEEP
+            ld de, $C900
+            ld bc, $0600
+            call memcpy
+            ld a, 1
+            ldh [rSVBK], a
+            ld hl, C_WINPAL
+            ld a, COMMON
+            ld de, sh_pal + 56
+            ld bc, 8
+            jp far_copy
+; the map again: the world map, or FF3 reload map (A = 1: the npcs kept)
+fr_reload:  xor a
+            ld [t44], a
+            ldh a, [maptype]
+            and a
+            jp nz, world_load
+            ld a, 1
+            jp load_map
+
 ; ---- FF3 battle from the field (3F/E26E: flash, the default battle background, the battle, the
 ; map reloaded): A = the battle id (z6A); the background from 39/BC00 (world 0) / BD00 by map
 battle_runw:                                ; (the world map: the background from the tile
@@ -223,71 +351,13 @@ battle_go:  ld a, [world]                   ; (+ $100 off world 0: batscr's bs_s
             inc a
 .w:         ld [bs_id + 1], a
             call lcd_off
-            xor a                           ; (the window off, the box closed)
-            ld [box_on], a
-            ldh a, [rLCDC]
-            res 5, a
-            ldh [rLCDC], a
-            ld a, 3                         ; the field's RAM kept
-            ldh [rSVBK], a
-            ld hl, $C900
-            ld de, SV_KEEP
-            ld bc, $0500
-            call memcpy
-            ld a, 1
-            ldh [rSVBK], a
-            ld hl, C_WINPAL                 ; (BG palette 7 for the battle's windows)
-            ld de, cgb_pal + 64
-            ld bc, 8
-            ld a, COMMON
-            call far_copy
-            ld a, 1
-            ldh [bmode], a
-            xor a
-            ldh [c_split], a
-            ldh [guard_on], a
-            ld a, LCDC_ON | $40
-            ldh [rLCDC], a
+            call fr_enter
             ld hl, bs_battle
             ld a, B_BSCR
             call far_call
             call lcd_off
-            di
-            xor a
-            ldh [bmode], a
-            ldh [c_split], a
-            ldh [guard_on], a
-            ldh [snd_isr], a
-            ld a, BOX_LINES - 1             ; (the field's STAT: the box's cut)
-            ldh [rLYC], a
-            ld a, $40
-            ldh [rSTAT], a
-            xor a
-            ldh [rSCX], a
-            ldh [rSCY], a
-            ld a, 3
-            ldh [rIE], a
-            ei
-            ld a, 3                         ; the field's RAM back
-            ldh [rSVBK], a
-            ld hl, SV_KEEP
-            ld de, $C900
-            ld bc, $0500
-            call memcpy
-            ld a, 1
-            ldh [rSVBK], a
-            ld hl, C_WINPAL                 ; (BG palette 7 again)
-            ld a, COMMON
-            ld de, sh_pal + 56
-            ld bc, 8
-            call far_copy
-            xor a
-            ld [t44], a
-            ldh a, [maptype]                ; the world map again (3E/C8E6) / FF3 reload map
-            and a                           ;   (3F/E7F8: A = 1, the npcs kept)
-            jp nz, world_load
-            ld a, 1
-            jp load_map
+            call fr_leave
+            jp fr_reload
 
 section wram, $DF00                         ; (WRAM bank 1)
 cgb_pal:    ds 72                           ; the battle's palettes (BG 0-3, OBJ 0-3, BG 7)

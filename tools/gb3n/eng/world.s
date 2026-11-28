@@ -198,7 +198,10 @@ w_frame:    call scroll_step
 .in:        ld a, [z6C]
             and a
             jr nz, .ev
-            xor a                           ; (Start / Select / A / B: with the menus and vehicles)
+            ld a, [z23]                     ; Start: the main menu (3E/C269)
+            and a
+            jp nz, menu_run
+            xor a                           ; (Select / A / B: with the vehicles)
             ld [z22], a
             ld [z23], a
             ld [z24], a

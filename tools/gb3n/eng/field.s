@@ -183,6 +183,7 @@ start:      di
             ld a, START_AA                  ; (a new game: map 0 from FF3's program start, 3E/C0E6;
             call load_map                   ;   test builds: the position given, kept)
 
+            jp main
 .wm:        call world_load
             jp main
 
@@ -982,9 +983,11 @@ check_input:
             ld a, [z24]                     ; A: npcs and treasures (3F/EA26)
             and a
             jp nz, a_button
-            xor a                           ; (B / Start / Select: with the menus)
+            ld a, [z23]                     ; Start: the main menu (3F/E340 -> 3D/A52F), the map
+            and a                           ;   reloaded after
+            jp nz, menu_run
+            xor a                           ; (B / Select: with their scripts)
             ld [z25], a
-            ld [z23], a
             ld [z22], a
 .ev:        ld a, [z4B]                     ; (a map title showing: nothing)
             cp $FF
@@ -1826,7 +1829,8 @@ not_cgb:    ldh a, [rLCDC]
             jr .h
 
 section wram, $C000
-oam_buf:    ds 256
+oam_buf:    ds 160
+section wram, $C100
 qbuf:       ds 2048
 section wram, $C900
 px:         ds 1

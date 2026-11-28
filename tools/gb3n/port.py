@@ -48,7 +48,8 @@ WROWS, WTSET, WGFX = 160, 176, 177              # the world maps (world.s)
 ROM_BANKS = 256
 ob = _load('build')                              # the kept battle / sound modules' builder
 KEPT = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s',
-        'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s', 'banim.s', 'bsumn.s', 'batfx.s', 'batbk.s', 'sound.s']
+        'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s', 'banim.s', 'bsumn.s', 'batfx.s', 'batbk.s', 'sound.s',
+        'menu.s', 'mini.s']
 BANK0_MOVE = {'batlib.s': ('$0450', '$1D00'), 'sound.s': ('$1000', '$2200')}
 B8 = data.B8
 
@@ -206,6 +207,30 @@ def entrances(rom, props):
     return rom.rd(0x10, p, 16)
 
 
+def order_defs(defs):
+    """the constants in an order where each is defined before it is used (files define them in any
+    order)"""
+    names = {}
+    for l in defs:
+        n = re.match(r'^([A-Za-z_]\w*)', l).group(1)
+        if n in names:
+            a, b = (x.split('=', 1)[1].split(';')[0].strip() for x in (names[n], l))
+            assert a == b, '%s defined twice: %s / %s' % (n, a, b)
+        names.setdefault(n, l)
+    out, done = [], set()
+    def emit(n, depth=0):
+        if n in done or n not in names or depth > 50:
+            return
+        done.add(n)
+        rhs = names[n].split('=', 1)[1].split(';')[0]
+        for t in re.findall(r'[A-Za-z_]\w*', rhs):
+            emit(t, depth + 1)
+        out.append(names[n])
+    for l in defs:
+        emit(re.match(r'^([A-Za-z_]\w*)', l).group(1))
+    return out
+
+
 def pack0(src):
     """bank 0's sections (after the header) packed one after the other: measured first in banks of
     their own (the same code at $4000: the same sizes), then placed from $0150 in their order"""
@@ -270,12 +295,18 @@ def main():
         src += '\n' + t
     sd = ob.sound_data()                         # (the period table: out of bank 0)
     assert sd.count('section bank 0, $3000') == 1
-    src += '\n' + ob.own_data(raw) + '\n' + sd.replace('section bank 0, $3000', 'section bank %d, $4000' % SNDT)
+    src += '\n' + ob.menu_data() + '\n' + ob.own_data(raw) + '\n' + sd.replace('section bank 0, $3000', 'section bank %d, $4000' % SNDT)
     src = ob.expand(src)
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     lines = src.split('\n')
-    src = '\n'.join([l for l in lines if is_def(l)] + [l for l in lines if not is_def(l)])
+    src = '\n'.join(order_defs([l for l in lines if is_def(l)]) + [l for l in lines if not is_def(l)])
+    import asm_sm83
+    asm_sm83.RAM_SECTIONS[:] = []
     r = asm(pack0(src))
+    secs = sorted(set((a, b) for a, b, _ in asm_sm83.RAM_SECTIONS if b > a))
+    over = [(x, y) for x, y in zip(secs, secs[1:]) if x[1] > y[0]]
+    for x, y in over:
+        print('RAM sections overlap: %04X-%04X and %04X-%04X' % (x + y))
     for lbl in ('oam_buf', 'qbuf'):
         assert r.labels[lbl] % 0x100 == 0, '%s not aligned' % lbl
     banks = dict(r.banks)
@@ -287,6 +318,8 @@ def main():
                    sgb=False, cgb=0xC0)
     open(out, 'wb').write(img)
     open(out[:-4] + '.sym', 'w').write(r.sym_file())
+    open(out[:-4] + '.lab', 'w').write(''.join('%04x %s\n' % (a, n) for n, a in sorted(r.labels.items(), key=lambda x: x[1])
+                                               if isinstance(a, int) and 0xC000 <= a < 0x10000))
     print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
 
 
