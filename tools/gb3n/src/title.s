@@ -141,39 +141,102 @@ tl_ask:     push hl
             scf
             ret
 
-; ---- the prophecy: each page centred, faded in, held (any button: on), faded out
+; ---- the prophecy as FF3 shows it (3A/8726-3A/8883): the screen NES blue ($02); each page's lines
+; 16 pixels apart, each line hidden (ink blue), then faded in (ink $00 -> $10 -> $20 -> $30, a step
+; every 16 frames, on odd frames a step lower: FF3's flicker), then shown in light grey ($10) while
+; the next one fades in; a page follows the last line at once (FF3 cuts). A, B or START ends the
+; prophecy (owner). CGB palettes 4 / 5 / 6 = hidden / fading / shown (menu_pals put back after).
+PR_HID     = 4
+PR_FADE    = 5
+PR_DONE    = 6
+pr_prev    = xtr_k                      ; (the encounter transition's bytes: free at the title)
+pr_f       = xtr_k + 1
+pr_v       = xtr_k + 2
+pr_n       = xtr_k + 3
+pr_r0      = xtr_k + 4
+pr_k       = xtr_k + 5
 tl_prophecy: ld a, 1                        ; song 1 (3A/8798)
             call snd_song
+            ld a, $FF
+            ld [pr_prev], a                 ; (a button still held from before: not a press)
+            ld b, 12                        ; palettes 4-6: all NES blue; 6's ink light grey
+            ld hl, pal_sh + 8 * PR_HID
+.pb:        push bc
+            push hl
+            ld a, $02
+            call pr_col
+            pop hl
+            pop bc
+            ld a, e
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            dec b
+            jr nz, .pb
+            ld a, $10
+            ld hl, pal_sh + 8 * PR_DONE + 6
+            call pr_set
             ld a, low(TL_PRO)
             ld [tl_ptr], a
             ld a, high(TL_PRO)
             ld [tl_ptr + 1], a
 .page:      call m_clear
-            ld a, $FF                       ; (black: palette 7 colours 1-3 off)
-            call tl_fade0
-            ld hl, tl_ptr                   ; the page's lines from row 5
+            ld hl, MC_ATTR                  ; (every cell hidden-blue)
+            ld bc, 32 * 18
+.at:        ld a, PR_HID
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .at
+            ld hl, tl_ptr                   ; the page's lines: counted, then drawn 2 rows apart
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld bc, $0105
+            ld c, 1
+.cnt:       ld a, [hl+]
+            and a
+            jr z, .cn
+            cp $0B
+            jr z, .cn
+            cp $01
+            jr nz, .cnt
+            inc c
+            jr .cnt
+.cn:        ld a, c
+            ld [pr_n], a
+            add a, a                        ; first row (19 - 2 n) / 2
+            cpl
+            add a, 20
+            srl a
+            ld [pr_r0], a
+            ld a, PR_HID
+            ld [m_attr], a
+            ld hl, tl_ptr
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, [pr_r0]
+            ld c, a
+            ld b, 1
 .ch:        ld a, [hl+]
             and a
-            jr z, .end
+            jr z, .drawn
             cp $0B
-            jr z, .pe
+            jr z, .drawn
             cp $01
             jr nz, .put
             ld b, 1
             inc c
+            inc c
             jr .ch
-.put:       call m_put
+.put:       call m_put2
             inc b
             jr .ch
-.pe:        call .show
-            jr .page
-.end:       call .show
-            ret
-.show:      ld a, l
+.drawn:     dec hl                          ; (the end code: $0B next page, 0 the last)
+            ld a, [hl+]
+            push af
+            ld a, l
             ld [tl_ptr], a
             ld a, h
             ld [tl_ptr + 1], a
@@ -181,79 +244,132 @@ tl_prophecy: ld a, 1                        ; song 1 (3A/8798)
             ld [m_dirty], a
             call cur_hide
             call wait_vbl
-            ld b, 0                         ; fade in (16 steps)
-.fi:        push bc
-            ld a, b
-            call tl_fade
-            ld b, 4
-.w1:        call wait_vbl
-            dec b
-            jr nz, .w1
-            pop bc
-            inc b
-            ld a, b
-            cp 17
-            jr nz, .fi
-            ld b, 180                       ; held 3 s, or until a button
-.h:         push bc
             call wait_vbl
-            call read_pad
-            pop bc
-            ldh a, [pad]
-            and a
-            jr nz, .fo
-            dec b
-            jr nz, .h
-.fo:        ld b, 16                        ; fade out
-.fd:        push bc
-            ld a, b
-            call tl_fade
-            ld b, 2
-.w2:        call wait_vbl
-            dec b
-            jr nz, .w2
-            pop bc
-            dec b
-            jr nz, .fd
             xor a
-            jp tl_fade
-; palette 7 for the prophecy: colour 0 black, the text colour (3) at A / 16 of white
-tl_fade0:   xor a
-tl_fade:    ld b, a                         ; (5-bit channels: v = 31 * A / 16 ~ 2 A)
+            ld [pr_k], a
+.line:      ld a, PR_FADE                   ; 3A/87E6: this line fades in
+            call pr_row
+            call pr_fade
+            jr c, .skip
+            ld a, PR_DONE                   ; then shows in grey
+            call pr_row
+            ld hl, pr_k
+            inc [hl]
+            ld a, [pr_n]
+            cp [hl]
+            jr nz, .line
+            call pr_frame                   ; (3A/87FE: one frame's input)
+            jr c, .skip
+            pop af
+            and a
+            jp nz, .page
+            jr .end
+.skip:      pop af
+.end:       ld hl, pal_sh + 8 * PR_HID      ; the screen black, the menus' palettes back
+            ld b, 24
+            xor a
+.bk:        ld [hl+], a
+            dec b
+            jr nz, .bk
+            ld a, 1
+            ldh [pal_dirty], a
+            call wait_vbl
+            call wait_vbl
+            call m_clear
+            ld a, 1
+            ld [m_dirty], a
+            call wait_vbl
+            call wait_vbl
+            jp menu_pals
+; line pr_k's row (pr_r0 + 2 k): its 20 cells to palette A, the attributes copied next V-Blank
+pr_row:     push af
+            ld a, [pr_k]
             add a, a
-            cp 32
-            jr c, .c
-            ld a, 31
-.c:         ld c, a                         ; RGB555 grey: r | g << 5 | b << 10
-            ld l, a
+            ld hl, pr_r0
+            add a, [hl]
+            ld l, a                         ; MC_ATTR + 32 row
             ld h, 0
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
-            add hl, hl                      ; g << 5
-            ld a, l
-            or c
-            ld l, a
-            ld a, c
-            add a, a
-            add a, a                        ; b << 10 -> high byte << 2
-            or h
-            ld h, a
-            ld de, pal_sh + 7 * 8           ; colours 0-2 black, 3 the text
-            xor a
-            ld b, 6
-.z:         ld [de], a
-            inc de
+            add hl, hl
+            ld de, MC_ATTR
+            add hl, de
+            pop af
+            ld b, 20
+.l:         ld [hl+], a
             dec b
-            jr nz, .z
-            ld a, l
-            ld [de], a
-            inc de
-            ld a, h
-            ld [de], a
-            ld a, 1
+            jr nz, .l
+            ld a, 2
+            ld [m_dirty], a
+            ret
+; 3A/8801: the fading line's ink $00 / $10 / $20 / $30, 16 frames each, odd frames a step lower
+; ($01 below $00); C set when a button ended the prophecy
+pr_fade:    xor a
+            ld [pr_v], a
+            ld [pr_f], a
+.f:         ld a, [pr_f]
+            ld b, a
+            and $0F
+            ld a, [pr_v]
+            jr z, .c
+            bit 0, b
+            jr z, .c
+            sub $10
+            jr nc, .c
+            ld a, $01
+.c:         ld hl, pal_sh + 8 * PR_FADE + 6
+            call pr_set
+            call pr_frame
+            ret c
+            ld hl, pr_f
+            inc [hl]
+            ld a, [hl]
+            and $0F
+            jr nz, .f
+            ld a, [pr_v]
+            add a, $10
+            ld [pr_v], a
+            cp $40
+            jr c, .f
+            and a
+            ret
+; a frame (3A/884C): the palettes up, the music, the pad; C set on a new A / B / START
+pr_frame:   ld a, 1
             ldh [pal_dirty], a
+            call wait_vbl
+            call read_pad
+            ldh a, [pad]
+            ld b, a
+            ld a, [pr_prev]
+            cpl
+            and b
+            ld c, a
+            ld a, b
+            ld [pr_prev], a
+            ld a, c
+            and $0B                         ; (A, B, START)
+            ret z
+            scf
+            ret
+; NES colour A -> RGB555 at [HL] (pr_col: -> DE)
+pr_set:     push hl
+            call pr_col
+            pop hl
+            ld a, e
+            ld [hl+], a
+            ld [hl], d
+            ret
+pr_col:     and $3F                         ; (NES_RGB: 2 bytes a colour)
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, NES_RGB
+            add hl, de
+            ld e, [hl]
+            inc hl
+            ld d, [hl]
             ret
 
 ; ---- the load menu (3D/B9F6): New Game and the speed on top, the files below; A on a valid file
