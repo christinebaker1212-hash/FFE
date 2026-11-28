@@ -376,6 +376,9 @@ vblank:     push af
             push hl
             ldh a, [rVBK]                   ; (the VRAM bank kept: a copy into bank 1 can be
             push af                         ;   interrupted; the handler's copies leave bank 0)
+            ld a, [wp_on]                   ; (a screen wipe: its window and edges first, while
+            and a                           ;   the V-Blank lasts; wipe.s)
+            call nz, wp_vbl0
             ld a, [s16_on]                  ; (battle magic: 8 x 16 sprites, btlfx.s)
             and a
             jr z, .o8
@@ -396,6 +399,9 @@ vblank:     push af
             call q_flush
             call win_vbl
             call menu_vbl
+            ld a, [wp_on]
+            and a
+            jr nz, .wpx
             ldh a, [rLCDC]                  ; the dialogue window (cut at line WIN_LINE) or a
             res 5, a                        ;   menu (the whole screen)
             ld b, a
@@ -407,9 +413,7 @@ vblank:     push af
             set 5, b
 .w:         ld a, b
             ldh [rLCDC], a
-            ld a, [wp_on]                   ; (a screen wipe: its window and edges, wipe.s)
-            and a
-            call nz, wp_vbl0
+.wpx:
             ld a, 1
             ldh [vbl_flag], a
             ldh a, [vbl_cnt]                ; (a V-Blank count: the cutscenes' pacing)

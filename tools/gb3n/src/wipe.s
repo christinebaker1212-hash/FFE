@@ -104,11 +104,12 @@ wipe_out9:  call wp_prep
             ldh [rLCDC], a
             ld a, 100
             ldh [rLYC], a
-            ld a, 2
-            ld [wp_st], a
             ld hl, pal_sh                   ; (every palette black, uploaded by the next V-Blank
             ld de, 128                      ;   before the load starts: it blackens them anyway)
             call memclr
+            ld a, 1                         ; (twice: an upload the edge's sound frame pushed out
+            ldh [pal_dirty], a              ;   of the V-Blank is dropped by the hardware)
+            call wait_vbl
             ld a, 1
             ldh [pal_dirty], a
             jp wait_vbl
@@ -247,17 +248,28 @@ wp_istep:   ld a, [wp_split]
             cp 72
             ret
 
-; ---- V-Blank (after the handler's own LCDC): the window and the first edge's line
+; ---- V-Blank (first thing in the handler): the window, and the frame's list of LY interrupts:
+; the edges and the sound's frame (once a frame, early: run at an edge low on the screen, it
+; held the V-Blank interrupt past the V-Blank and the frame showed without the wipe)
+WA_SND      = 0                             ; actions: the sound only
+WA_TOP      = 1                             ;   curtains' top: the window off
+WA_BOT      = 2                             ;   curtains' bottom: the window on
+WA_SPL      = 3                             ;   split, the gap's bottom: the window off, SCY
+WA_S        = $80                           ;   (+ the sound after it)
 wp_vbl9:    xor a
+            ld [wp_i], a
+            ld [wp_n], a
             ldh [rWY], a
             ld a, 7
             ldh [rWX], a
+            ld a, [wp_top]
+            ld b, a
+            ld a, [wp_bot]
+            ld c, a
             ld a, [wp_split]
             and a
             jr nz, .split
-            ld a, [wp_top]                  ; curtains: black above the top, below the bottom
-            ld b, a
-            ld a, [wp_bot]
+            ld a, c                         ; curtains: black above the top, below the bottom
             cp b
             jr z, .all
             jr c, .all
@@ -265,50 +277,79 @@ wp_vbl9:    xor a
             and a
             jr z, .notop
             call .won
-            ld a, [wp_top]
+            ld a, b
             dec a
-            ldh [rLYC], a
-            xor a
-            ld [wp_st], a
-            ret
+            ld d, a
+            ld e, WA_TOP | WA_S
+            call .add
+            ld a, c
+            cp 144
+            jr nc, .go
+            dec a
+            ld d, a
+            ld e, WA_BOT
+            call .add
+            jr .go
 .notop:     call .woff
-            ld a, [wp_bot]
+            ld a, c
             cp 144
             jr nc, .snd
+            call .s19
+            ld a, c
             dec a
-            ldh [rLYC], a
-            ld a, 1
-            ld [wp_st], a
-            ret
+            ld d, a
+            ld e, WA_BOT
+            call .add
+            jr .go
 .all:       call .won
-.snd:       ld a, 100                       ; (no edge: the sound's line only)
-            ldh [rLYC], a
-            ld a, 2
-            ld [wp_st], a
-            ret
-.split:     ld a, [wp_top]                  ; the upper half shifted up: SCY + 72 - top
-            ld b, a
-            ld a, [wp_bot]
-            cp b
+.snd:       ld d, 100                       ; (no edge: the sound's line only)
+            ld e, WA_SND | WA_S
+            call .add
+            jr .go
+.split:     ld a, c                         ; split: the gap [top, bottom) black (the window
+            cp b                            ;   from WY = top), the upper half shifted up
             jr nz, .gap
             call .woff                      ; (no gap: the whole picture)
             jr .snd
-.gap:       ld a, 72                        ; (the gap: the window from its top line, WY)
+.gap:       ld a, 72
             sub b
-            ld c, a
+            ld d, a
             ldh a, [scy]
-            add a, c
+            add a, d
             ldh [rSCY], a
             ld a, b
             ldh [rWY], a
             call .won
-            ld a, [wp_bot]
+            ld a, c
             cp 144
             jr nc, .snd
+            call .s19
+            ld a, c
             dec a
+            ld d, a
+            ld e, WA_SPL
+            call .add
+.go:        ld a, [wp_l]                    ; the first interrupt's line
             ldh [rLYC], a
-            ld a, 4
-            ld [wp_st], a
+            ret
+.s19:       ld d, 19
+            ld e, WA_SND | WA_S
+.add:       ld a, [wp_n]                    ; D = line, E = action
+            ld l, a
+            inc a
+            ld [wp_n], a
+            ld h, 0
+            push de
+            ld de, wp_l
+            add hl, de
+            pop de
+            ld [hl], d
+            ld a, l
+            add a, 3
+            ld l, a
+            jr nc, .ad1
+            inc h
+.ad1:       ld [hl], e
             ret
 .won:       ldh a, [rLCDC]
             set 5, a
@@ -319,25 +360,48 @@ wp_vbl9:    xor a
             ldh [rLCDC], a
             ret
 
-; ---- STAT (LYC = an edge's line - 1): the change in that line's H-Blank. A = 1: the frame's
-; last interrupt (the sound runs after it), 0: another follows
-wp_stat9:   ld a, [wp_st]
-            cp 2
-            jr z, .one
+; ---- STAT: this entry's action in its line's H-Blank, the next entry's line. A = 1: the
+; sound's frame after it
+wp_stat9:   ld a, [wp_i]
             ld b, a
+            ld a, [wp_n]
+            cp b
+            jr z, .none                     ; (past the list: nothing)
+            ld a, b
+            add a, low(wp_a)
+            ld l, a
+            ld a, high(wp_a)
+            adc a, 0
+            ld h, a
+            ld c, [hl]                      ; C = action
+            inc b
+            ld a, b
+            ld [wp_i], a
+            ld a, [wp_n]
+            cp b
+            jr z, .nl
+            ld a, b
+            add a, low(wp_l)
+            ld l, a
+            ld a, high(wp_l)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ldh [rLYC], a                   ; (the next one: later in this frame)
+.nl:        ld a, c
+            and $7F
+            jr z, .ret                      ; (the sound only)
 .w:         ldh a, [rSTAT]
             and 3
             jr nz, .w
-            ld a, b
-            and a
-            jr z, .s0
-            dec a
-            jr z, .s1
-            dec a
-            dec a
-            jr z, .s3
-            ldh a, [rLCDC]                  ; 4 (split, the gap's bottom): the window off, the
-            res 5, a                        ;   lower half's scroll SCY + 72 - bottom
+            ld a, c
+            and $7F
+            cp WA_TOP
+            jr z, .off
+            cp WA_BOT
+            jr z, .on
+            ldh a, [rLCDC]                  ; WA_SPL: the window off, the lower half's scroll
+            res 5, a                        ;   SCY + 72 - bottom
             ldh [rLCDC], a
             ld a, [wp_bot]
             ld b, a
@@ -347,38 +411,19 @@ wp_stat9:   ld a, [wp_st]
             ldh a, [scy]
             add a, b
             ldh [rSCY], a
-            jr .one
-.s0:        ldh a, [rLCDC]                  ; 0 (curtains, the top): the window off
+            jr .ret
+.off:       ldh a, [rLCDC]
             res 5, a
             ldh [rLCDC], a
-            ld a, [wp_bot]
-            cp 144
-            jr nc, .one
-            dec a
-            ldh [rLYC], a
-            ld a, 1
-            ld [wp_st], a
-            xor a
-            ret
-.s1:        ldh a, [rLCDC]                  ; 1 (curtains, the bottom): the window on
+            jr .ret
+.on:        ldh a, [rLCDC]
             set 5, a
             ldh [rLCDC], a
-            jr .one
-.s3:        ldh a, [rLCDC]                  ; 3 (split, the gap's top): the window on
-            set 5, a
-            ldh [rLCDC], a
-            ld a, [wp_bot]
-            cp 144
-            jr nc, .one
-            dec a
-            ldh [rLYC], a
-            ld a, 4
-            ld [wp_st], a
-            xor a
+.ret:       ld a, c
+            rlca
+            and 1
             ret
-.one:       ld a, 2
-            ld [wp_st], a
-            ld a, 1
+.none:      xor a
             ret
 
 section wram, $C321
@@ -388,3 +433,7 @@ wp_bot:     ds 1
 wp_st:      ds 1
 wp_split:   ds 1
 wp_psav:    ds 8
+wp_i:       ds 1
+wp_n:       ds 1
+wp_l:       ds 3
+wp_a:       ds 3

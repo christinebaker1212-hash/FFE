@@ -451,7 +451,9 @@ stat_isr:   push af
             and a
             jr z, .nw
             push bc
+            push hl
             call wp_stat0
+            pop hl
             pop bc
             and a
             jr nz, .x

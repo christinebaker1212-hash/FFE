@@ -401,3 +401,19 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   else in the next V-Blank. Then every counter 0 (52 instructions with cart RAM on: the boot's save
   check between its enable and disable). Not yet run under the checker: a spell / summon in the
   8 x 16 mode (its GDMA starts in its V-Blank handler, at most 24 pairs).
+- 2026-11-28 (this branch, owner: "combine your efforts"): the engine moved here from
+  `claude/vibrant-davinci-lc8boi`. Fixed from the owner's play: monster tiles $70-$7F showed the
+  field font (FF3's 4 x 4 monsters sit at the bottom of a 4 x 6 slot over a cleared pattern table:
+  the slot's tiles are cleared first); the V-Blank handler keeps the VRAM bank (an interrupted copy
+  into bank 1 went on into bank 0); the command window's first column cleared (names showed
+  through); damage numerals by side as FF3 ($7E4F the target's side by $7E6F, $7E5F the attacker's
+  by $7E9A bit 7: a monster's hit on a member showed over a monster); the exit to the world map at
+  FF3's place (00/8880 / 88C0 by $0730 = map property 11 or event $F9, fix:E2CE), not the New Game
+  position; the earlier engine's name entry (picture, name, job, 9 x 5 letters, SELECT case, B
+  delete, START OK; FF3's duplicate-name rule); FF3's screen wipes (`src/wipe.s`, CODE6): curtains
+  closing / opening on maps (3E/D08C / D066), the world map's split sliding apart / together
+  (3E/CF79 / CF9F), 3 lines a frame; the black is the window layer with palette 7 black, switched
+  at the edges from the LY interrupt; the sound's frame at its own early LY interrupt while an edge
+  is low on the screen (run at the edge, it held the V-Blank interrupt past the V-Blank). The
+  Color-only message moved out of bank 0 (it was full). Mock-ups sent: main menu (FF1's
+  arrangement), dialogue box (margin, typed text), battle commands over the HP side.
