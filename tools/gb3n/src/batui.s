@@ -719,14 +719,10 @@ bs_magic:   ld a, [$DED8]
             xor a
             ld [bs_cur], a
 .draw:      call bs_mlist
-.loop:      ld a, [bs_cur]                  ; hand at row 14, column 1 + 6 x cursor
+.loop:      ld a, [bs_cur]                  ; hand at row 14 + cursor, column 1 (a spell a row:
+            add 14                          ;   the translation's names are longer than FF3's)
             ld b, a
-            add a
-            add b
-            add a
-            inc a
-            ld c, a
-            ld b, 14
+            ld c, 1
             call bs_hand_cell
             call bs_frame
             ldh a, [pad_new]
@@ -734,13 +730,13 @@ bs_magic:   ld a, [$DED8]
             jr nz, .ok
             bit 1, a
             jr nz, .x
-            bit 6, a
+            bit 4, a                        ; (right / left: the level; up / down: the spell)
             jr nz, .up
-            bit 7, a
-            jr nz, .dn
             bit 5, a
+            jr nz, .dn
+            bit 6, a
             jr nz, .lt
-            bit 4, a
+            bit 7, a
             jr nz, .rt
             jr .loop
 .up:        ld a, [bs_lv]
@@ -955,7 +951,7 @@ bs_mlist:   ld de, $0C00
             dec e
             jr nz, .s
             ld c, 0
-.w:         push bc                         ; names at row 14, columns 2 / 8 / 14
+.w:         push bc                         ; names at rows 14-16, column 2
             ld a, c
             ld hl, bs_sp
             call bs_hl_a
@@ -969,14 +965,10 @@ bs_mlist:   ld de, $0C00
             pop bc
             push bc
             ld a, c
-            ld b, a
-            add a
-            add b
-            add a
-            add 2
-            ld e, a
-            ld d, 14
-            ld a, 5
+            add 14
+            ld d, a
+            ld e, 2
+            ld a, 16
             ld [bs_maxw], a
             call bs_putsn
 .ws:        pop bc
