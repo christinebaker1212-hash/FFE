@@ -459,8 +459,26 @@ win_vbl:    ld a, [wp_on]                   ; (a screen wipe covers with the win
             ld [win_dirty], a
             ret
 
+; the encounter transition (wipe.s bt_trans9): the next line's SCX / SCY from page hrx / hrx + 1
+stat_rx:    push hl
+            ld h, a
+            ldh a, [rLY]
+            inc a
+            ld l, a
+            ld a, [hl]
+            ldh [rSCX], a
+            inc h
+            ld a, [hl]
+            ldh [rSCY], a
+            pop hl
+            pop af
+            reti
+
 ; LCD status interrupt (LYC = WIN_LINE - 1): the window off from the next line on
 stat_isr:   push af
+            ldh a, [hrx]                    ; (the encounter transition: every line's H-Blank)
+            and a
+            jr nz, stat_rx
             ld a, [wp_on]                   ; (a screen wipe: its edges, the sound after the last)
             and a
             jr z, .nw

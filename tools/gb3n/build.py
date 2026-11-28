@@ -221,6 +221,7 @@ CODE8 = 119                             # magic animations (btlfx.s), 33 at $600
 MAGG = 120                              # NES banks $2A-$2B (FF3's magic graphics) as GB tiles
 FXD = 121                               # magic animation data (btlfx.s, btlsum.s)
 CODE9 = 122                             # the summons (btlsum.s), 32 at $6000
+TRANS_BANK = 123                        # the encounter transition's tables (trans.py, FF1's)
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -289,7 +290,8 @@ def engine_src(rom=None):
         return t
     cs = [[xcalls(c, bank) for c, _ in ss] for (bank, _), ss in zip(bb, srcs)]
     codes.insert(len(MODULES), ''.join(
-        '%s__f: call far_s\n db %d\n dw %s\n' % (n, b, n) for n, b in sorted(used.items())))
+        '%s__f: call far_s\n db %d\n dw %s\n' % (n, b, n) for n, b in sorted(used.items())) +
+        'bank0_end:\n')                 # (bank 0's code ends here: free up to $3E00)
     for (bank, _), c1, ss in zip(bb, cs, srcs):
         codes.append('section bank %d, $4000' % bank)
         for c, (_, r) in zip(c1, ss):
@@ -426,6 +428,8 @@ def main():
     cut_hi, banks[CUTD], cut_syms = cut.pack(rom, CUTD)
     banks[CUTD2] = cut.pack2(rom)
     w0b = rom.prg[0x0B * 0x2000:0x0C * 0x2000]
+    import trans
+    banks[TRANS_BANK] = bytearray(trans.trans_tables())
     banks[W0B_BANK] = bytearray(b''.join(nes2gb(w0b[16 * t:16 * t + 16]) for t in range(512)) + bytes(0x2000))
     src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     title_on = opt['--map'] == '' and opt['--group'] == '0'
@@ -437,7 +441,7 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
-                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, 'CODE8': CODE8, 'CODE9': CODE9, 'MAGG': MAGG, 'FXD': FXD, **cut_syms,
+                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, 'CODE8': CODE8, 'CODE9': CODE9, 'TRANS_BANK': TRANS_BANK, 'MAGG': MAGG, 'FXD': FXD, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

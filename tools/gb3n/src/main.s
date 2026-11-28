@@ -272,7 +272,15 @@ main:       call wait_vbl
             ld [ev_par], a
             call ev_spec
             jp main
-.na1:       cp $A5
+.na1:       cp $B0                          ;   ($B0: the battle tst_btl)
+            jr nz, .na3
+            xor a
+            ld [tst_choc], a
+            ld a, [tst_btl]
+            ld [act_id], a
+            call battle_go
+            jp main
+.na3:       cp $A5
             jr nz, .nt
             xor a
             ld [tst_choc], a
@@ -1819,3 +1827,4 @@ s16_lo:     ds 1
 s16_hi:     ds 1
 s16_n:      ds 1
 s16_front:  ds 1
+hrx:        ds 1                            ; (the encounter transition: the line tables' page)

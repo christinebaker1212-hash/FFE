@@ -6,9 +6,10 @@
 ; init, the battle main loop, the fade out; then the map is reloaded.
 btl_pals   = $DF00              ; (WRAM bank 3, FF3's unused $7F00-: the palettes before the flash)
 
-btl_main:   call btl_flash
-            call pal_black                  ; (the LCD stays on behind black: no white screen;
-            ld a, 3                         ;   the VRAM copies by DMA)
+btl_main:   ld a, CODE6                     ; FF1's encounter transition (owner; in place of
+            ld hl, bt_trans9                ;   FF3's flash, btl_flash): the battle then loads
+            call far_call                   ;   behind white (the LCD on: the copies by DMA)
+            ld a, 3
             ldh [rSVBK], a
             call inv_pair                   ; (3C/BC12: the inventory as pairs)
             ld hl, BZ                       ; FF3's battle RAM cleared (zero page, $7200-$7EFF)

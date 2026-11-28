@@ -499,6 +499,254 @@ tw_page9:   ld a, [t_bank]                  ; the page's start
             pop af
             ret
 
+; ---- FF1's encounter transition (owner, 2026-11-28: the fancy battle transition we made for
+; FF1; loc.s bt_trans2 there): 8 frames of two white flashes, 24 of the map swirling and drawn in
+; towards the party, 16 of its lines parting as the picture folds onto the party's line into
+; white; then white while the battle loads. Per-line SCX / SCY from trans.py (TRANS_BANK), written
+; in each line's H-Blank by stat_rx (text.s) from page hrx; FF3's encounter sound ($95) as
+; btl_flash. The tables in WRAM bank 2 (the menu canvas's bank: free at the battle's start).
+TR_P0      = $D8                            ; frame pages: even frames $D8 / $D9, odd $DA / $DB
+TR_SAVE    = $DC00                          ; the palettes as they were (128)
+TR_WT      = $DD00                          ; the fade to white: 8 levels x 32
+TR_FR      = 48
+bt_trans9:  ld a, $95                       ; (FF3's encounter sound)
+            ld [S49], a
+            ld a, 2
+            ldh [rSVBK], a
+            ldh a, [scx]
+            ld [xtr_x0], a
+            ldh a, [scy]
+            ld [xtr_y0], a
+            ld hl, pal_sh
+            ld de, TR_SAVE
+            ld bc, 128
+            call memcpy
+            ld hl, $7600
+            ld de, TR_WT
+            ld bc, 256
+            ld a, TRANS_BANK
+            call rd_copy
+            ld hl, oam_buf + 16             ; (the sprites: the party only)
+            ld b, 36
+            call oam_hide.l0
+            xor a
+            ld [xtr_k], a
+            call xtr_prep                    ; frame 0
+            di
+            call xtr_page                   ; (the page first: with hrx 0 the handler's other
+            ld a, h                         ;   work would run on every line)
+            ldh [hrx], a
+            ld a, $08                       ; (STAT: mode 0 each line, no LYC meanwhile)
+            ldh [rSTAT], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ei
+.f:         call xtr_page                    ; line 0's scroll for the V-Blank to write
+            ld l, 0
+            ld a, [hl]
+            ldh [scx], a
+            inc h
+            ld a, [hl]
+            ldh [scy], a
+            call wait_vbl
+            call xtr_page                    ; (this frame's lines)
+            ld a, h
+            ldh [hrx], a
+            call snd_frame                  ; (the sound: its LY interrupt is not running)
+            ld hl, xtr_k
+            inc [hl]
+            ld a, [hl]
+            cp TR_FR
+            jr nc, .end
+            call xtr_prep
+            jr .f
+.end:       ld hl, pal_sh                   ; white
+            ld b, 64
+.w:         ld a, $FF
+            ld [hl+], a
+            ld a, $7F
+            ld [hl+], a
+            dec b
+            jr nz, .w
+            ld a, 1
+            ldh [pal_dirty], a
+            call wait_vbl
+            di
+            xor a
+            ldh [hrx], a
+            ld a, $40
+            ldh [rSTAT], a
+            ld a, WIN_LINE - 1
+            ldh [rLYC], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ei
+            ld a, [xtr_x0]
+            ldh [scx], a
+            ld a, [xtr_y0]
+            ldh [scy], a
+            ld hl, oam_buf
+            ld b, 40
+            call oam_hide.l0
+            ld b, 6
+.ww:        push bc
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, .ww
+            ret
+; H = frame xtr_k's SCX page (L = 0)
+xtr_page:    ld a, [xtr_k]
+            rrca
+            ld hl, TR_P0 << 8
+            ret nc
+            ld hl, (TR_P0 + 2) << 8
+            ret
+; frame xtr_k's lines (the tables plus the field's scroll) and its colours
+xtr_prep:    ld a, [xtr_k]                    ; HL = $4000 + 288 k
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [xtr_k]
+            add a, h
+            add a, $40
+            ld h, a
+            push hl
+            call xtr_page
+            ld d, h
+            ld e, l
+            pop hl
+            push hl
+            push de
+            ld bc, 144
+            ld a, TRANS_BANK
+            call rd_copy
+            pop de
+            pop hl
+            ld bc, 144
+            add hl, bc
+            inc d
+            ld a, TRANS_BANK
+            call rd_copy
+            call xtr_page
+            ld a, [xtr_x0]
+            ld d, a
+            ld b, 144
+.ax:        ld a, [hl]
+            add a, d
+            ld [hl+], a
+            dec b
+            jr nz, .ax
+            ld l, 0
+            inc h
+            ld a, [xtr_y0]
+            ld d, a
+            ld b, 144
+.ay:        ld a, [hl]
+            add a, d
+            ld [hl+], a
+            dec b
+            jr nz, .ay
+            ld a, [xtr_k]                    ; the frame's colour level (0 unchanged, 1 the
+            ld l, a                         ;   colours as they were, 2-9 the fade's 1-8)
+            ld h, $77
+            ld a, TRANS_BANK
+            call rd_byte
+            and a
+            ret z
+            dec a
+            jr nz, .fd
+            ld hl, TR_SAVE
+            ld de, pal_sh
+            ld bc, 128
+            call memcpy
+            jr .up
+.fd:        dec a                           ; 64 colours through the table (32 (level - 2))
+            swap a
+            add a, a
+            ld [xtr_t], a
+            ld hl, TR_SAVE
+            ld de, pal_sh
+            ld b, 64
+.c:         push bc
+            ld a, [hl+]
+            ld c, a                         ; low: GGGRRRRR
+            ld a, [hl+]
+            ld b, a                         ; high: 0BBBBBGG
+            push hl
+            ld a, [xtr_t]
+            ld h, high(TR_WT)
+            ld l, a
+            ld a, c                         ; red
+            and 31
+            add a, l
+            push hl
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ld [xtr_r], a
+            ld a, b                         ; green
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            ld [xtr_g], a
+            ld a, c
+            swap a
+            rrca
+            and 7
+            push hl
+            ld hl, xtr_g
+            or [hl]
+            pop hl
+            add a, l
+            push hl
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ld [xtr_g], a
+            ld a, b                         ; blue
+            rrca
+            rrca
+            and 31
+            add a, l
+            ld l, a
+            ld a, [hl]
+            add a, a
+            add a, a
+            ld b, a
+            ld a, [xtr_g]
+            ld c, a
+            swap a
+            add a, a
+            and $E0
+            ld l, a
+            ld a, [xtr_r]
+            or l
+            ld [de], a
+            inc de
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and 3
+            or b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .c
+.up:        ld a, 1
+            ldh [pal_dirty], a
+            ret
+
 section wram, $C321
 wp_on:      ds 1
 wp_top:     ds 1
@@ -510,3 +758,13 @@ wp_i:       ds 1
 wp_n:       ds 1
 wp_l:       ds 3
 wp_a:       ds 3
+
+section wram, $C370                         ; (the encounter transition)
+xtr_k:       ds 1
+xtr_x0:      ds 1
+xtr_y0:      ds 1
+xtr_t:       ds 1
+xtr_r:       ds 1
+xtr_g:       ds 1
+tst_btl:    ds 1                            ; (test hook: main.s tst_choc $B0)
+
