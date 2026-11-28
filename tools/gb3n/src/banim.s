@@ -1387,11 +1387,9 @@ an_bgoff:   ld a, [an_bgm]
             call an_frame
             ld d, 0                         ; rows 0-11, columns 16-19 from MON_T / MON_A (the
 .r:         ld e, 16                        ;   top window's cells left while it shows)
-.c:         ld a, d
-            cp 4
-            jr nc, .cp
-            ld a, [bs_topon]
-            and a
+.c:         ld a, [bs_topon]
+            cp d
+            jr c, .cp
             jr z, .cp
             ld a, e
             cp 18

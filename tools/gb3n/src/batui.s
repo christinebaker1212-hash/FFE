@@ -1135,9 +1135,9 @@ bs_script:  ld a, [$DEC2]
             ld hl, BZ + $64
             inc [hl]
             jr .c
-.end:       xor a
+.end:       call bs_topoff
+            xor a
             ld [bs_topon], a
-            call bs_topoff
             jp bs_pwin
 .go:        jp hl
 bs_scripts: dw .s0, .s1, .s2, .s3, .s4, .s5
@@ -1174,7 +1174,9 @@ bs_topwin:  push af
             ld a, [bs_topon]
             and a
             jr nz, .x
-            inc a
+            ld [bs_trow], a
+            ld [bs_twr], a
+            ld a, 4                         ; (bs_topon: the window's height in rows)
             ld [bs_topon], a
             call bs_top
 .x:         pop af
@@ -1182,21 +1184,26 @@ bs_topwin:  push af
 ; $05 attacker name (top window, line 1)
 bsc_who:    call bs_topwin
             ld a, [$D8D6]
-            ld de, $0101
-            jp bs_actor
+            call bs_actor
+            ret z
+            call bs_tnew
+            ld a, [bs_trow]                 ; (the attack goes after it when it fits)
+            ld [bs_twr], a
+            ld a, [bs_tcol]
+            ld [bs_twc], a
+            ret
 ; $07 target name (line 2); $88: all
 bsc_whom:   call bs_topwin
             ld a, [$D8D8]
-            ld de, $0201
             cp $88
-            jp nz, bs_actor
-            ld de, $0220 + $16
+            jr z, .all
+            call bs_actor
+            ret z
+            jp bs_tnew
+.all:       ld de, $0220 + $16
             call bs_name
-            ld de, $0201
-            ld a, 9
-            ld [bs_maxw], a
-            jp bs_putsn
-; an actor's name A ($FF none, $80 + slot a monster, else a character) at (D, E)
+            jp bs_tnew
+; an actor's name A ($FF none, $80 + slot a monster, else a character) -> BS_STR (Z: none)
 bs_actor:   cp $FF
             ret z
             push de
@@ -1218,27 +1225,31 @@ bs_actor:   cp $FF
             ld d, a
             call bs_name
             pop de
-            ld a, 9
-            ld [bs_maxw], a
-            jp bs_putsn
+            or 1                            ; (NZ)
+            ret
 .ch:        call bs_choff                   ; a character: 6 letters from the save page +6
             add 6
             ld l, a
             ld h, $D1
             pop de
-            ld b, 6
+            ld bc, BS_STR
 .c:         ld a, [hl+]
             push hl
             push bc
             call bs_ff3char
-            call bs_putc
             pop bc
             pop hl
-            inc e
-            dec b
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(BS_STR) + 6
             jr nz, .c
+            xor a
+            ld [bc], a
+            inc a                           ; (NZ)
             ret
 .x:         pop de
+            xor a
             ret
 ; $06 the attack: an item's name, a spell, hits, Miss, a summon, a message (line 1, right)
 bsc_what:   call bs_topwin
@@ -1288,27 +1299,29 @@ bsc_what:   call bs_topwin
             adc 0
             ld d, a
 .nm:        call bs_name
-            ld de, $010A
-            ld a, 7
-            ld [bs_maxw], a
-            jp bs_putsn
-.hits:      ld l, a                         ; "n hits"
+            jp bs_twhat
+.hits:      ld l, a                         ; "n hits": the number, a space, the word
             ld h, 0
             push hl
             ld de, $0220 + $13
             call bs_name
             pop hl
-            call bs_dec                     ; two digits at (1, 10), the word at (1, 13)
-            ld de, $010A
+            call bs_dec
+            ld hl, BS_STR + 28              ; (the word 3 cells on)
+            ld de, BS_STR + 31
+            ld b, 29
+.mv:        ld a, [hl-]
+            ld [de], a
+            dec de
+            dec b
+            jr nz, .mv
+            ld hl, BS_STR
             ld a, [bs_numb + 2]
-            call bs_putc
-            inc e
+            ld [hl+], a
             ld a, [bs_numb + 3]
-            call bs_putc
-            ld a, 4
-            ld [bs_maxw], a
-            ld de, $010D
-            jp bs_putsn
+            ld [hl+], a
+            ld [hl], ' '
+            jp bs_twhat
 ; $08 the status message (line 2, right): t8200 $0C + n
 bsc_stat:   ld a, [$D8D9]
             cp $FF
@@ -1322,10 +1335,7 @@ bs_t82:     ld d, 0                         ; t8200 entry E at (2, 10)
             add hl, de
             add hl, de
             call bs_tget
-            ld de, $020A
-            ld a, 7
-            ld [bs_maxw], a
-            jp bs_putsn
+            jp bs_tadd
 ; a text index entry at HL (B_TEXT) -> BS_STR
 bs_tget:    push hl
             ld de, bs_tmp
@@ -1645,10 +1655,15 @@ bs_numspr:  push de
 .p:         ld a, [bs_topon]                ; below the top window while it shows
             and a
             jr z, .p2
+            add a
+            add a
+            add a
+            add 16
+            ld b, a
             ld a, [bs_ny]
-            cp 16 + 32
+            cp b
             jr nc, .p2
-            ld a, 16 + 32
+            ld a, b
             ld [bs_ny], a
 .p2:        pop de
             ld a, [bs_nn]                   ; OAM 24 + 5 n
@@ -2757,3 +2772,197 @@ bs_mitem:   push de
             sub e
             ld [bs_maxw], a
             jp bs_putsn
+
+section wram, $C5E8
+bs_trow:    ds 1                            ; the top window's last text row (0: none yet)
+bs_tcol:    ds 1                            ;   and the column after its text
+bs_twr:     ds 1                            ; the attacker's row (0: none)
+bs_twc:     ds 1                            ;   and the column after it
+
+section bank B_BSCR, $7100
+; ---- the top window's text: FF3's attacker / attack / target windows hold 8 letters; the English
+; names run to 20, so the strings go in reading order, wrapped at spaces within columns 1-16, and
+; the window grows a row at a time when the text needs one (bs_topon = its height).
+; bs_tnew: BS_STR on a new row; bs_tadd: on the row's end when it fits (column 10 when both fit
+; FF3's layout, else right-aligned), else on a new row
+bs_tnew:    call bs_trim
+            ld a, [bs_trow]
+            inc a
+            ld d, a
+            ld e, 1
+            jr bs_tput
+bs_twhat:   ld a, [bs_twr]                  ; the attack: on the attacker's row when it fits
+            and a
+            jr z, bs_tadd
+            ld d, a
+            ld a, [bs_twc]
+            jr bs_tat
+bs_tadd:    ld a, [bs_trow]
+            and a
+            jr z, bs_tnew
+            ld d, a
+            ld a, [bs_tcol]
+bs_tat:     push af                         ; (row D, its text ending before column A)
+            push de
+            call bs_trim                    ; B = the length
+            pop de
+            pop af
+            ld c, a
+            cp 10
+            jr nc, .r
+            ld a, b
+            cp 8
+            jr nc, .r
+            ld e, 10
+            jr bs_tput
+.r:         ld a, c
+            inc a
+            add b
+            cp 18
+            jr nc, bs_tnew
+            ld a, 17
+            sub b
+            ld e, a
+; BS_STR from (D, E), a word on the next row when it does not fit
+bs_tput:    ld hl, BS_STR
+.lead:      ld a, [hl]
+            cp ' '
+            jr nz, .w
+            inc hl
+            jr .lead
+.w:         ld a, [hl]
+            and a
+            jr z, .end
+            push hl
+            ld b, 0
+.wl:        ld a, [hl+]
+            and a
+            jr z, .we
+            cp ' '
+            jr z, .we
+            cp $18
+            jr c, .wl
+            inc b
+            jr .wl
+.we:        pop hl
+            ld a, e
+            add b
+            cp 18
+            jr c, .fit
+            ld a, e
+            cp 2
+            jr c, .fit                      ; (a word wider than the window: cut at its frame)
+            inc d
+            ld e, 1
+.fit:       call bs_trowok
+            jr c, .end
+.ch:        ld a, [hl]
+            and a
+            jr z, .end
+            cp ' '
+            jr z, .sp
+            inc hl
+            cp $18
+            jr c, .ch
+            ld c, a
+            ld a, e
+            cp 17
+            jr nc, .ch
+            ld a, c
+            call bs_putc
+            inc e
+            jr .ch
+.sp:        inc hl
+            inc e
+            jr .w
+.end:       ld a, [bs_trow]                 ; (the last row only moves down)
+            cp d
+            jr z, .t
+            ret nc
+.t:         ld a, d
+            ld [bs_trow], a
+            ld a, e
+            ld [bs_tcol], a
+            ret
+; the window tall enough for text row D (C: it cannot grow further)
+bs_trowok:  push hl
+.g:         ld a, [bs_topon]
+            ld l, a
+            ld a, d
+            add 2
+            cp l
+            jr z, .ok
+            jr c, .ok
+            ld a, l
+            cp 8                            ; (8 rows at most: the monsters' upper part)
+            jr nc, .no
+            push de
+            call bs_topext
+            pop de
+            jr .g
+.ok:        pop hl
+            and a
+            ret
+.no:        pop hl
+            scf
+            ret
+; one row more: the bottom frame becomes a middle row, the new bottom row below it
+bs_topext:  ld a, [bs_topon]
+            ld d, a
+            dec d
+            ld e, 0
+            ld a, FR_L
+            call bs_putc
+            ld b, 16
+.s:         inc e
+            ld a, ' '
+            call bs_putc
+            dec b
+            jr nz, .s
+            inc e
+            ld a, FR_R
+            call bs_putc
+            inc d
+            ld e, 0
+            ld a, FR_BL
+            call bs_putc
+            ld b, 16
+.b:         inc e
+            ld a, FR_B
+            call bs_putc
+            dec b
+            jr nz, .b
+            inc e
+            ld a, FR_BR
+            call bs_putc
+            ld hl, bs_topon
+            inc [hl]
+            ret
+; BS_STR without trailing spaces; B = its length (codes below $18 and leading spaces not counted)
+bs_trim:    ld hl, BS_STR
+            ld c, 0                         ; C = the length up to the last letter
+            ld b, 0
+.lead:      ld a, [hl]
+            cp ' '
+            jr nz, .c
+            inc hl
+            jr .lead
+.c:         ld a, [hl+]
+            and a
+            jr z, .e
+            cp $18
+            jr c, .c
+            inc b
+            cp ' '
+            jr z, .c
+            ld c, b
+            push hl
+            pop de                          ; DE = past the last letter
+            jr .c
+.e:         ld a, c
+            and a
+            ret z
+            xor a
+            ld [de], a
+            ld b, c
+            ret

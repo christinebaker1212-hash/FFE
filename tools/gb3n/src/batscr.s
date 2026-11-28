@@ -1321,25 +1321,38 @@ bs_win:     push de
             pop de
             ret
 
-; the top window (rows 0-3) over the monsters; bs_topoff puts the monsters back
+; the top window (rows 0 to bs_topon - 1) over the monsters; bs_topoff puts the monsters back
 bs_top:     ld de, 0                        ; (18 wide: the party's column stays clear)
-            ld bc, $0412
+            ld a, [bs_topon]
+            ld b, a
+            ld c, 18
             jp bs_win
-bs_topoff:  ld hl, MON_T
-            ld de, SH_T
-            ld bc, 80
-            call memcpy
-            ld hl, MON_A
-            ld de, SH_A
-            ld bc, 80
-            call memcpy
+bs_topoff:  ld a, [bs_topon]
+            and a
+            ret z
+            ld b, a
             ld hl, SH_D
             ld a, 1
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl], a
-            ret
+.d:         ld [hl+], a
+            dec b
+            jr nz, .d
+            ld a, [bs_topon]                ; 20 x the rows
+            add a
+            add a
+            ld c, a
+            add a
+            add a
+            add c
+            ld c, a
+            ld b, 0
+            push bc
+            ld hl, MON_T
+            ld de, SH_T
+            call memcpy
+            pop bc
+            ld hl, MON_A
+            ld de, SH_A
+            jp memcpy
 
 ; ---- a frame: wait for V-Blank, copy dirty rows (4 at most), sprites, sound, the pad
 bs_frame:   call bs_opre                    ; (a back attack: the sprites mirrored)
@@ -1838,13 +1851,12 @@ bs_srect:   ld a, [$DD7B]
             jr c, .b
             ld a, 12
 .b:         ld b, a                         ; B = the end row
-            ld a, [bs_topon]
-            and a
+            ld a, [bs_topon]                ; (from the top window's height down)
+            ld c, a
             ld a, [fl_y]
-            jr z, .t
-            cp 4
+            cp c
             jr nc, .t
-            ld a, 4
+            ld a, c
 .t:         ld [fl_y], a
             ld c, a
             ld a, b

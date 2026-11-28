@@ -19,11 +19,9 @@ bs_mcell:   ld b, 0
             sub e
             ld e, a
             ld b, $20
-            ld a, d
-            cp 4
-            jr nc, .n
-            ld a, [bs_topon]
-            and a
+            ld a, [bs_topon]                ; (under the top window: rows below its height)
+            cp d
+            jr c, .n
             jr z, .n
             ld a, e
             cp 2
@@ -88,10 +86,10 @@ bs_vrowm:   ld a, c
             sub l
             ld h, a
             ld a, [bs_mrow]
-            cp 4
-            jr nc, .m
+            ld b, a
             ld a, [bs_topon]
-            and a
+            cp b
+            jr c, .m
             jr nz, .w
 .m:         ld a, 19
             add l
@@ -249,11 +247,9 @@ an_mcell:   ld b, 0
             sub e
             ld e, a
             ld b, $20
-            ld a, d
-            cp 4
-            jr nc, .n
-            ld a, [bs_topon]
-            and a
+            ld a, [bs_topon]                ; (under the top window: rows below its height)
+            cp d
+            jr c, .n
             jr z, .n
             ld a, e
             cp 2

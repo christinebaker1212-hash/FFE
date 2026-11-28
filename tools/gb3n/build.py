@@ -592,7 +592,7 @@ ms_bat:     xor a
             ld [bs_id + 1], a
             call battle_run
             jp wait_vbl
-section bank B_BSCR, $7C80
+section bank B_BSCR, $7E00
 ms_weak:    call bs_bossin2
             ld hl, B_MO + 3
             ld b, 8
@@ -626,7 +626,8 @@ ms_weak:    call bs_bossin2
             ret
 '''
             assert src.count('            call bs_bossin2\n            call bs_loop') == 1
-            src = src.replace('            call bs_bossin2\n            call bs_loop', '            call ms_weak\n            call bs_loop')
+            if not os.environ.get('GB3N_BSTRONG'):   # (GB3N_BSTRONG: the monsters as they are)
+                src = src.replace('            call bs_bossin2\n            call bs_loop', '            call ms_weak\n            call bs_loop')
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'
