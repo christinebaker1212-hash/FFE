@@ -5,6 +5,61 @@
 ; copied by DMA in one V-Blank. Layout: the owner-approved mock N5B / N6 (tools/gb3n/menu.py).
 ; (MC_MAP, MC_ATTR, MP_T, JOB_T, SN_T, PAL_TXT, PAL_HP: main.s)
 
+; ---- the earlier screens from the new main menu (mm.s, bank CODE11) until each is rebuilt:
+; mm_cmd = 0 Item, 1 Magic, 2 Equip, 3 Status, 5 Job, 6 Save; mm_arg = the member. Their own
+; tiles and palettes first (as menu_open), the canvas in WRAM 2.
+old_sub:    call old_setup
+            ld a, [mn_cmd]
+            and a
+            jp z, item_menu
+            cp 6
+            jp z, save_menu
+            ld b, a
+            ld a, [mn_arg]
+            ld c, a
+            ld a, b
+            cp 1
+            ld a, c
+            jp z, magic_menu
+            ld a, b
+            cp 2
+            ld a, c
+            jp z, equip_menu
+            ld a, b
+            cp 3
+            ld a, c
+            jp z, status
+            jp job_menu
+opt_sub:    call old_setup
+            jp options
+eq_all:     ld a, 3                         ; (eq_calc for every member: from other banks)
+.eq:        push af
+            call eq_calc
+            pop af
+            dec a
+            cp $FF
+            jr nz, .eq
+            ret
+old_setup:  call oam_hide
+            call menu_pals
+            ld a, MENU_BANK
+            ld [vc_src], a
+            ld hl, $5100
+            ld de, $8000 + 16 * MP_T
+            ld b, 20
+            ld a, 1
+            call vcopyx
+            call hand_ld
+            call font_menu
+            call mm_jobtiles
+            ld a, 2
+            ldh [rSVBK], a
+            call m_clear
+            ld a, 1
+            ld [m_dirty], a
+            ld [menu_on], a
+            ret
+
 ; Start on the field (fix:E340)
 menu_open:  ld a, 3                         ; (each member's values from the equipment)
 .eq:        push af

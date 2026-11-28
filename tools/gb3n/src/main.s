@@ -316,8 +316,8 @@ main:       call wait_vbl
             ld a, [pad_new]                 ;   Start: the menu (fix:E340)
             bit 3, a
             jr z, .sl
-            ld a, CODE1
-            ld hl, menu_open
+            ld a, CODE11                    ; (the new main menu: mm.s)
+            ld hl, mn_open
             call far_call
             jr main
 .sl:        bit 1, a                        ;   B on a world map: the Invincible (fix:C282);
