@@ -858,10 +858,10 @@ map_song:   call enc_setrate
             bit 7, a
             jp z, mus_play
             and 7
-            add $38
+            add $38                         ; (2C/8800 + 2 x ($38 + n) = 2C/8870 + 2n: 3F/E8DB)
             ld c, a
             ld b, 0
-            ld hl, $4870
+            ld hl, $4800
             add hl, bc
             add hl, bc
             call scr_ptr
@@ -870,12 +870,13 @@ map_song:   call enc_setrate
             ld a, B_SCRIPT
             call far_copy
             call scr_event
-            jp mus_play
+            jp ev_sound                     ; (as event command $F8: 3F/E8F1)
 .world:     ld a, [world]
             and a
             jr z, .w
             dec a
-.w:         add a
+.w:         add a                           ; (8 bytes a world: 3B/A00D)
+            add a
             add a
             ld e, a                         ; + the vehicle (3B/A006)
             ld a, [veh]
@@ -885,8 +886,15 @@ map_song:   call enc_setrate
             ld hl, w_songs
             add hl, de
             ld a, [hl]
-            jp mus_play
+            call mus_play
+            ld hl, w_sfx                    ; the vehicle's sound ($FF: none, the last one muted)
+            add hl, de
+            ld a, [hl]
+            or $80
+            ld [M_SFX], a
+            ret
 w_songs:    ds 32                           ; (FF3's table 3B/A027, from the ROM at build time)
+w_sfx:      ds 32                           ; (3B/A047)
 
 ev_npcdlg:  ld e, a                         ; $F0: the person's dialogue (their list, entry A)
             ld d, 0

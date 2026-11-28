@@ -203,8 +203,13 @@ snd_frame:  ldh a, [rSVBK]                   ; (work RAM bank 1: a battle maps b
 
 ; the song bank for the song asked for ($899F: $00-$18 bank $37, $19-$2A $38, $37-$3A $39,
 ; $3B-$40 $09; $2B-$36 are in bank $36, in every GB sound bank)
-snd_bank:   ld a, [M_SONG]
-            ld b, 0
+snd_bank:   ld a, [M_CTRL]                  ; (the bank of the song playing, unless a new one
+            rra                             ;   starts: this runs from V-Blank during loads, so a
+            ld a, [M_SONG]                  ;   new id can arrive before its "play" bit; FF3's
+            jr c, .n                        ;   36/899F reads $7F43 from its main loop)
+            ld a, [M_CUR]
+            and $7F
+.n:         ld b, 0
             cp $19
             jr c, .s
             inc b

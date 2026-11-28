@@ -80,7 +80,14 @@ gu_load:    ld a, [SRAM_PAGE + $0B]
             jr .cp
 .guz:       ld hl, $6040                    ; (B_COMMON: 0D/8000)
             ld a, B_COMMON
-.cp:        push af
+.cp:        push af                         ; (LCD off or in a guarded load: straight in; from
+            ldh a, [rLCDC]                  ;   an event with the screen on: staged, then a
+            cpl                             ;   general DMA in V-Blank)
+            and $80
+            ld d, a
+            ld a, [guard_on]
+            or d
+            jr z, .dma
             ld a, 1
             ldh [rVBK], a
             pop af
@@ -89,6 +96,27 @@ gu_load:    ld a, [SRAM_PAGE + $0B]
             call far_copy
             xor a
             ldh [rVBK], a
+            jr .pal
+.dma:       pop af
+            ld de, SCRATCH
+            ld bc, $100
+            call far_copy
+            call wait_vbl
+            ld a, 1
+            ldh [rVBK], a
+            ld a, high(SCRATCH)
+            ldh [rHDMA1], a
+            ld a, low(SCRATCH)
+            ldh [rHDMA2], a
+            ld a, $81
+            ldh [rHDMA3], a
+            xor a
+            ldh [rHDMA4], a
+            ld a, 15
+            ldh [rHDMA5], a
+            xor a
+            ldh [rVBK], a
+.pal:
             ld a, [wmode]
             and a
             ret z

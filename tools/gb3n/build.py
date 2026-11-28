@@ -327,6 +327,7 @@ def sound_data():
 # tables of FF3's code banks filled from the user's ROM after assembling: label -> (NES bank, address, n)
 ROMDATA = {
     'w_songs': (0x3B, 0xA027, 32),       # world map songs by world and vehicle
+    'w_sfx': (0x3B, 0xA047, 32),         # and their sound effects
     'refl_bits': (0x31, 0xBB0E, 11),     # spells that Reflect bounces
     'mon_rows': (0x34, 0x8739, 20),      # monster rows by formation tilemap
     'mmsg_bits': (0x35, 0xA5FD, 9),      # spells with a message after them
@@ -556,6 +557,76 @@ ev_fxtest:  call ev_shake
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation
         src = src.replace('            call an_wgfx                    ; the weapons\' tiles and palettes (2F/A8EA)',
                           '            call an_wgfx\n            ld a, %s\n            ld [an_t1], a\n            ld a, [BZ + $BB]\n            and a\n            jr nz, .wt\n            inc a\n            ld [BZ + $BB], a\n.wt:' % os.environ['GB3N_ANWPN'])
+    if os.environ.get('GB3N_MAPSWEEP'):          # test builds only: a write to $DDF0 enters map [$DDF2] of
+        assert 'main_loop:  call wait_vbl\n' in src  #   world [$DDF1]; $DDF3 counts main-loop passes
+        src = src.replace('main_loop:  call wait_vbl\n', 'main_loop:  call ms_hook\n')
+        src += '''section bank 0, $2F00
+ms_hook:    ld hl, $DDF3
+            inc [hl]
+            ld a, [$DDF0]
+            and a
+            jp z, wait_vbl
+            xor a
+            ld [$DDF0], a
+            ld [$DDF3], a
+            ld [wmode], a
+            ld [map_sp], a
+            ld a, [$DDF1]
+            ld [world], a
+            ld a, [$DDF2]
+            ld [map_id], a
+            ld a, $FF
+            ld [enter_x], a
+            call map_change
+            jp wait_vbl
+'''
+        if os.environ.get('GB3N_BSWEEP'):        # (and $DDF0 = 2: battle [$DDF1:$DDF2], its monsters at 1 HP)
+            src = src.replace('            jp z, wait_vbl\n            xor a\n            ld [$DDF0], a\n',
+                              '            jp z, wait_vbl\n            cp 2\n            jr z, ms_bat\n            xor a\n            ld [$DDF0], a\n', 1)
+            src += '''section bank 0, $2F40
+ms_bat:     xor a
+            ld [$DDF0], a
+            ld a, [$DDF2]
+            ld [bs_id], a
+            ld a, [$DDF1]
+            ld [bs_id + 1], a
+            call battle_run
+            jp wait_vbl
+section bank B_BSCR, $7C80
+ms_weak:    call bs_bossin2
+            ld hl, B_MO + 3
+            ld b, 8
+.m:         ld a, [hl+]
+            or [hl]
+            jr z, .n
+            ld [hl], 0
+            dec hl
+            ld [hl], 1
+            push hl
+            ld de, $21 - 3
+            add hl, de
+            xor a
+            ld [hl+], a                     ; (evade multiplier and %: 0)
+            ld [hl], a
+            pop hl
+            inc hl
+.n:         ld de, $3F
+            add hl, de
+            dec b
+            jr nz, .m
+            ld hl, B_CH + $17               ; (the party: 8 hits at 99%)
+            ld b, 4
+.c:         ld [hl], 8
+            inc hl
+            ld [hl], 99
+            ld de, $3F
+            add hl, de
+            dec b
+            jr nz, .c
+            ret
+'''
+            assert src.count('            call bs_bossin2\n            call bs_loop') == 1
+            src = src.replace('            call bs_bossin2\n            call bs_loop', '            call ms_weak\n            call bs_loop')
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'
