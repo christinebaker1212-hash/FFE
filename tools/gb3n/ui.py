@@ -135,7 +135,7 @@ GB_WORDS = {'U_LV': 'LV', 'U_HP': 'HP', 'U_GIL': 'Gil', 'U_CAP': 'Capacity', 'U_
             'U_TSPD': 'Text Speed', 'U_VOL': 'Volume', 'U_CTRL': 'Controls', 'U_WIN': 'Window',
             'U_DEF0': 'Return to Default', 'U_DASH': 'B Dash', 'U_CURS': 'Cursor', 'U_RED': 'Red',
             'U_GRN': 'Green', 'U_BLU': 'Blue', 'U_GRAD': 'Gradient', 'U_ON': 'On', 'U_OFFW': 'Off',
-            'U_REMEM': 'Remember', 'U_RESET': 'Reset'}
+            'U_REMEM': 'Remember', 'U_RESET': 'Reset', 'U_DASH': '------'}
 
 
 def sight_data(rom, rgb555):
@@ -159,7 +159,7 @@ def sight_data(rom, rgb555):
     def db(label, data):
         return '%s:\n' % label + ''.join('    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
                                          for k in range(0, len(data), 16))
-    return db('SG_COL', col) + db('SG_PAL', pal) + db('SG_FL', fl), spr
+    return db('SG_COL', col) + db('SG_PAL', pal), db('SG_FL', fl), spr
 
 
 def code_data(rom, rgb555, group_world, bank, bank12):
@@ -170,7 +170,8 @@ def code_data(rom, rgb555, group_world, bank, bank12):
                                          for k in range(0, len(data), 16))
     names, _ = menu.job_names(rom)
     cmds = [bytes(c for c in w if c != 0xFF or True) for w in menu.commands(rom)[:7]]
-    cmds = [w.rstrip(b'\xFF') for w in cmds] + [text.encode(GB_WORDS['U_CONFIG'])]
+    cmds = [w.rstrip(b'\xFF') for w in cmds] + [text.encode(GB_WORDS['U_CONFIG']),
+                                                  text.encode(menu.GB_TEXT['s_sus'])]
     cmds[3] = text.encode('Status')                     # (FF3 draws it in tiles $E1-$E4)
     src = db('U_GLY', glyphs()) + db('U_PALS', palettes(rom, rgb555))
     src += db('U_PFREE', rom.b(0x2E, 0x9E4A, 4)) + db('U_PJOB', rom.b(0x2E, 0x9E4E, 22))
@@ -205,8 +206,9 @@ def code_data(rom, rgb555, group_world, bank, bank12):
     far += strtab('U_MJOB', [wrap(0x3A)])               # (the Job screen: $013A)
     src += db('U_ITEMW', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x35)))) + b'\0')
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
-    sd, spr = sight_data(rom, rgb555)
-    src += sd
+    sd, sfl, spr = sight_data(rom, rgb555)
+    src += sfl
+    far += sd
     lab = menu.status_labels(rom)                      # (the Status screen: FF3's words, t8200 $47)
     stw = ['Proficiency', 'Strength', 'Agility', 'Stamina', 'Intelligence', 'Spirit', 'To next level',
            'Attack', 'Hit rate', 'Defense', 'Evasion rate', 'Magic defense']
@@ -222,12 +224,21 @@ def code_data(rom, rgb555, group_world, bank, bank12):
     src += db('U_SV2', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x4D)))) + b'\0')
     gt = menu.GB_TEXT
     src += db('U_OFF', text.encode(gt['s_off']) + b'\x01' + text.encode(gt['s_off2']) + b'\0')
+    src += db('U_SUSQ', text.encode(gt['s_sq1']) + b'\x01' + text.encode(gt['s_sq2']) + b'\x01' +
+              text.encode(gt['s_sq3']) + b'\0')
     src += db('U_SUS', text.encode(gt['s_cs1']) + b'\x01' + text.encode(gt['s_cs2']) + b'\0')
     src += db('U_SPD', text.encode(gt['s_spd']) + b'\0')
     ng = re.sub(r'\{[^}]*\}', '', text.decode(text.raw_string(rom, 't8200', 0x22))).strip()
     src += db('U_NEWG', text.encode(ng) + b'\0')
     for k, v in (('U_USE', 's_use'), ('U_SWAP', 's_swap'), ('U_MITEM', 's_item')):
         src += db(k, text.encode(w[v]) + b'\0')          # (the Magic screen: FF3's Use / Swap / Item)
+    import soundtest, bestiary                         # (Extras: soundtest.py's words and names)
+    st = soundtest.STRINGS
+    for k, v in (('U_EXT', 'ex_t_ex'), ('U_STT', 'ex_t_st'), ('U_BST', 'ex_t_bs'), ('U_SONG', 'ex_song'),
+                 ('U_NOWP', 'ex_now'), ('U_STH0', 'ex_h0'), ('U_STH1', 'ex_h1'), ('U_STH2', 'ex_h2')):
+        src += db(k, text.encode(st[v]) + b'\0')
+    far += strtab('U_SONGN', [text.encode(n[:20]) for n in soundtest.names(rom)])
+    far += bestiary.code_data(rom, rgb555)
     # (tiles copied by DMA: 16-byte aligned, at the bank's end)
     src += 'section bank %d, $7FD0\n' % bank + db('U_ZTILE', bytes(16)) + db('SG_SPR', spr)
     src += 'section bank %d, $4000\n' % bank12 + far

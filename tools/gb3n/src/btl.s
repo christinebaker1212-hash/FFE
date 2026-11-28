@@ -357,7 +357,9 @@ mon_set:    ld a, [W7 + $7CED]
             inc a
             cp 4
             jr nz, .cn
-            ret
+            ld a, CODE11                    ; (the Bestiary: these monsters met, bst.s)
+            ld hl, bs_mark
+            jp far_call
 
 ; 2F/A0E7: monster id A -> BZ+$7E = graphics properties (size class, id), BZ+$7F = graphics id
 ; + the size class's offset, msb from the boss table (2E/8F00 + id >> 3, bit id and 7)

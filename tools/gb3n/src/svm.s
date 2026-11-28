@@ -81,6 +81,8 @@ svm_load:   call u_open
             call svm_ud
             jr .l
 .a:         ld a, [sv_cur]
+            cp 4
+            jr z, .ext
             cp 3
             jr z, .new
             ld [mgm_t], a
@@ -103,6 +105,16 @@ svm_load:   call u_open
             ld a, 1
             ld [u_eres], a
             ret
+.ext:       ld a, $85                       ; Extras (FF1's: on the title)
+            ld [S49], a
+            call u_fadeout
+            call xm_run
+            ld a, 1
+            ld [svm_mode], a
+            call svm_scr
+            call u_flush
+            call u_fadein
+            jp .l
 .new:       ld a, $85                       ; (3D/BAC6: the speed -> $6010)
             ld [S49], a
             ld a, [opt_spd]
@@ -115,24 +127,32 @@ svm_load:   call u_open
             ret
 
 ; up / down (A = the new keys): the files (and New Game, 3, above them on the title)
-svm_ud:     ld b, a
+svm_ud:     ld b, a                         ; (title: New Game 3, Extras 4, then the files)
             ld a, [sv_cur]
             bit 6, b
             jr z, .d
             cp 3
             ret z
-            and a
+            cp 4
+            jr nz, .u0
+            ld a, 3
+            jr .s
+.u0:        and a
             jr nz, .u
             ld a, [svm_mode]
             and a
             ret z
-            ld a, 3
+            ld a, 4
             jr .s
 .u:         dec a
             jr .s
 .d:         bit 7, b
             ret z
             cp 3
+            jr nz, .d4
+            ld a, 4
+            jr .s
+.d4:        cp 4
             jr nz, .dn
             xor a
             jr .s
@@ -146,8 +166,12 @@ svm_ud:     ld b, a
 ; the hand: at file f's picture (rows 7 + 4 f), or at New Game
 svm_fhand:  ld a, [sv_cur]
             cp 3
-            jr nz, .f
-            ld bc, $0302
+            jr c, .f
+            sub 3                           ; (New Game row 1, Extras row 3)
+            add a, a
+            inc a
+            ld c, a
+            ld b, 3
             jp u_hand
 .f:         add a, a
             add a, a
@@ -179,7 +203,7 @@ svm_scr:    call oam_hide
 svm_redraw: call svm_scr
             jp u_flush
 ; the top: the save's question, or New Game and the speed (pool 0-19)
-svm_top:    ld bc, $0102
+svm_top:    ld bc, $0101
 .cl:        push bc
             ld a, U_FILL
             call u_cell
@@ -187,6 +211,11 @@ svm_top:    ld bc, $0102
             inc b
             ld a, b
             cp 19
+            jr nz, .cl
+            ld b, 1
+            inc c
+            ld a, c
+            cp 4
             jr nz, .cl
             xor a
             ld [u_pool], a
@@ -199,12 +228,15 @@ svm_top:    ld bc, $0102
             ld hl, U_SV0
             call u_text
             jr .x
-.ld:        ld bc, $0302
+.ld:        ld bc, $0301
             ld hl, U_NEWG
+            call u_text
+            ld bc, $0303
+            ld hl, U_EXT
             call u_text
             ld a, UP_LABEL
             ld [u_pal], a
-            ld bc, $0B02
+            ld bc, $0B01
             ld hl, U_SPD
             call u_text
             ld a, UP_WHITE
@@ -214,7 +246,7 @@ svm_top:    ld bc, $0102
             ld e, a
             ld d, 0
             call u_ntoa
-            ld bc, $1302
+            ld bc, $1301
             call u_textr
 .x:         ld a, 1
             ld [m_dirty], a

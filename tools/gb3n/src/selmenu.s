@@ -63,8 +63,8 @@ sel_open:   call menu_pals
             jr .top
 .ex:        dec a
             jr nz, .sus
-            ld a, CODE10                    ; (extras.s: the Sound Test, the Bestiary)
-            ld hl, ex_open
+            ld a, CODE11                    ; (bst.s: the Sound Test, the Bestiary)
+            ld hl, xm_open
             call far_call
             ld a, 1
             ld [m_cur], a

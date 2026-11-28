@@ -82,7 +82,8 @@ wm_sight:   call u_hoff
             ldh [rSVBK], a
             ld de, u_palt + 7 * 8
             ld bc, 8
-            call memcpy
+            ld a, CODE12                    ; (SG_PAL, SG_COL: bank CODE12)
+            call rd_copy
             ld hl, SG_FL
             ld de, u_palt + 64 + 4 * 8
             ld bc, 8
@@ -128,6 +129,11 @@ sg_tabs:    ld a, [sg_k]
             rr l
             ld de, SG_COL
             add hl, de
+            ld de, SG_ROW                   ; (from CODE12 into the row buffer first)
+            ld bc, 128
+            ld a, CODE12
+            call rd_copy
+            ld hl, SG_ROW
             ld de, SG_CT
 .l:         ld a, [hl+]
             ld c, a

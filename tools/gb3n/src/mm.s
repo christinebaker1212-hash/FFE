@@ -4,7 +4,7 @@
 ; name + LV, job, HP from cell 4; commands (12,0,8,10) from cell 15, the hand at cells 13-14;
 ; Gil / Capacity and the place (12,10,8,8). Commands as FF3's (t8200 $31) and Config;
 ; Save only on a world map (3D/A59F: greyed elsewhere, the error sound).
-MM_N       = 8
+MM_N       = 9
 
 mn_open:    ld a, CODE1                     ; (each member's values from the equipment: equip.s)
             ld hl, eq_all
@@ -62,6 +62,8 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             ld a, [mn_cur]
             cp 4
             jp z, mn_order
+            cp 8
+            jp z, mn_sus
             cp 7
             jr z, .cfg
             and a                           ; Item: rebuilt (itm.s)
@@ -224,6 +226,82 @@ mn_pick:    ld a, [mn_mem]
             and a
             ret
 
+; Suspend (owner: in the main menu): "Create a Suspend Point and return to the Title?" Yes / No
+; (No first); Yes: the point to cart RAM bank 1 (selmenu.s sus_save), then the title
+mn_sus:     ld bc, $0205
+            ld de, $1008
+            call u_box
+            ld a, 140
+            ld [u_pool], a
+            ld a, UP_WHITE
+            ld [u_pal], a
+            ld bc, $0406
+            ld hl, U_SUSQ
+.ln:        push bc
+            call u_text
+            pop bc
+            dec hl
+            ld a, [hl+]
+            cp 1
+            jr nz, .yn
+            inc c
+            jr .ln
+.yn:        ld bc, $060A
+            ld hl, U_YES
+            call u_text
+            ld bc, $0C0A
+            ld hl, U_NO
+            call u_text
+            call u_hoff
+            call oam_hide
+            call u_flush
+            ld a, 1
+            ld [mn_t], a
+.l:         ld a, [mn_t]                    ; the hand: Yes (cell 6) / No (cell 12)
+            add a, a
+            ld b, a
+            add a, a
+            add a, b
+            add a, 6
+            ld b, a
+            ld c, $0A
+            call u_hand
+            call wait_vbl
+            call u_keys
+            ld a, [m_new]
+            bit 1, a
+            jr nz, .no
+            bit 0, a
+            jr nz, .a
+            and $30
+            jr z, .l
+            ld a, [mn_t]
+            xor 1
+            ld [mn_t], a
+            ld a, $98
+            ld [S49], a
+            jr .l
+.a:         ld a, [mn_t]
+            and a
+            jr nz, .no
+            ld a, $85
+            ld [S49], a
+            call u_fadeout
+            call u_groff
+            ld a, CODE1
+            ld hl, sus_save
+            call far_call
+            call oam_hide
+            call wait_vbl
+            di
+            jp start
+.no:        ld a, $85
+            ld [S49], a
+            call u_hoff
+            call mn_draw
+            call u_flush
+            jp mn_open.l
+
 ; Order (3D/A696): a member's battle row toggled ($620F + $40 m bit 0); again until B
 mn_order:   call mn_pick
             jp c, mn_open.re
@@ -279,10 +357,10 @@ mn_draw:    call u_cls
             ld de, $0C12
             call u_box
             ld bc, $0C00
-            ld de, $080A
+            ld de, $080B
             call u_box
-            ld bc, $0C0A                    ; (Gil, Capacity; the place below: up to 3 lines)
-            ld de, $0808
+            ld bc, $0C0B                    ; (Gil, Capacity; the place below: 3 lines, or 4
+            ld de, $0807                    ;   from Capacity's row)
             call u_box
             xor a
             ld [u_k], a
@@ -323,39 +401,14 @@ mn_draw:    call u_cls
             ld a, [hl]
             cp MM_N
             jr nz, .c
-            ld a, UP_LABEL                  ; Gil, Capacity
-            ld [u_pal], a
-            ld bc, $0D0B
-            ld hl, U_GIL
-            call u_text
-            ld bc, $0D0C
-            ld hl, U_CAP
-            call u_text
-            ld a, UP_WHITE
-            ld [u_pal], a
-            ld a, [GS + $1C]                ; (gil: up to 999999; shown as FF3 does, 6 digits)
-            ld e, a
-            ld a, [GS + $1D]
-            ld d, a
-            ld a, [GS + $1E]
-            ld c, a
-            call mn_gil
-            ld bc, $130B
-            call u_textr
-            ld a, [GS + $1B]
-            ld e, a
-            ld d, 0
-            call u_ntoa
-            ld bc, $130C
-            call u_textr
-            ldh a, [is_world]               ; the place
+            ldh a, [is_world]               ; the place first (its lines: 4 take Capacity's row)
             and a
             ld hl, U_WORLD
             jr nz, .pl
             ld a, [M_ENT + 8]               ; (the map's title id: its name from CODE12)
             ld hl, U_TITLE
             call u_fstr
-.pl:        push hl                         ; (four lines: from row 13, else 14)
+.pl:        push hl
             ld c, $0E
             ld b, 0
 .cn:        ld a, [hl+]
@@ -369,7 +422,11 @@ mn_draw:    call u_cls
             cp 3
             jr c, .c3
             dec c
-.c3:        pop hl
+.c3:        ld a, c
+            ld [mn_row], a
+            pop hl
+            ld a, UP_WHITE
+            ld [u_pal], a
             ld b, $0D
 .ln:        push bc
             call u_text
@@ -377,9 +434,40 @@ mn_draw:    call u_cls
             dec hl                          ; (another line after a {01})
             ld a, [hl+]
             cp 1
-            ret nz
+            jr nz, .gil
             inc c
             jr .ln
+.gil:       ld a, UP_LABEL                  ; Gil, Capacity
+            ld [u_pal], a
+            ld bc, $0D0C
+            ld hl, U_GIL
+            call u_text
+            ld a, [mn_row]
+            cp $0E
+            jr nz, .nc
+            ld bc, $0D0D
+            ld hl, U_CAP
+            call u_text
+.nc:        ld a, UP_WHITE
+            ld [u_pal], a
+            ld a, [GS + $1C]                ; (gil: up to 999999; shown as FF3 does, 6 digits)
+            ld e, a
+            ld a, [GS + $1D]
+            ld d, a
+            ld a, [GS + $1E]
+            ld c, a
+            call mn_gil
+            ld bc, $130C
+            call u_textr
+            ld a, [mn_row]
+            cp $0E
+            ret nz
+            ld a, [GS + $1B]
+            ld e, a
+            ld d, 0
+            call u_ntoa
+            ld bc, $130D
+            jp u_textr
 
 ; member u_k: the picture, name, LV, job, HP (rows 1 + 4 m ..)
 mn_member:  ld a, [u_k]

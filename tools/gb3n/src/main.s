@@ -338,16 +338,9 @@ main:       call wait_vbl
             xor a
             ld [tk_b], a
 .gb1:       ld a, [pad_new]
-.sl0:       bit 2, a                        ;   Select: the Select menu; B + Select: the next
-            jr z, .mv                       ;     member walks (fix:F72C)
-            ldh a, [pad]
-            bit 1, a
-            jr z, .sm
-            call next_char
-            jr main
-.sm:        ld a, CODE1
-            ld hl, sel_open
-            call far_call
+.sl0:       bit 2, a                        ;   Select: the next member walks (fix:F72C; the
+            jr z, .mv                       ;     owner: FF3's own; Config / Suspend in the
+            call next_char                  ;     main menu, Extras on the title)
             jr main
 .mv:        call move
             call g_frame

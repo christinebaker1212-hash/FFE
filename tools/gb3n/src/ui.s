@@ -1021,7 +1021,12 @@ u_flush:    ld a, [u_dlo]
             jr c, .n
             ld a, 24
 .n:         ld [u_t], a
-            call wait_vbl
+.wv:        call wait_vbl                   ; (and the V-Blank's start still: its handler can be
+            ldh a, [rLY]                    ;   long, the canvas's copy, the gradient; a copy
+            cp 144                          ;   running into the picture loses bytes)
+            jr c, .wv
+            cp 148
+            jr nc, .wv
             ld a, [u_dlo]                   ; source U_BUF + 16 lo, destination $8000 + 16 (U_T0 + lo)
             swap a
             ld l, a
