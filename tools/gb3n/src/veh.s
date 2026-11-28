@@ -438,14 +438,24 @@ veh_land:   ld a, [px]
 ; 3E/CD7E the step speed (pixels a frame): underwater 1; speed 8 starts a step at 4
 veh_speed:  ldh a, [is_world]
             and a
-            ld a, 1
-            ret z
+            jr z, .foot
             ld a, [cur_world]
             cp 4
-            ld a, 1
-            ret nc
+            jr nc, .foot
+            ld a, [VEH]                     ; (a vehicle: its speed)
+            and a
+            jr z, .foot
             ld a, low(VEH_SPD)
-            call veh_tab
+            jp veh_tab
+.foot:      ld a, [opt_dash]                ; on foot: B held dashes (Config's B Dash, FF1's;
+            and a                           ;   the steps and their encounters as walking)
+            ld a, 1
+            ret nz
+            ldh a, [pad]
+            and 2
+            ld a, 1
+            ret z
+            inc a
             ret
 
 ; ---- sprites: the party's vehicle (instead of the walking sprite) and the parked ones
