@@ -487,3 +487,9 @@ Color only" screen on older systems.
 - build/sbsh model names must be exactly "Game Boy", "Game Boy Color", "Super Game Boy"; anything else (e.g.
   "dmg") silently runs as a Color, and plain Game Boy timing checks then pass for the wrong system.
 - Test the owner's own spot: a pace measured somewhere else said nothing about the frames the owner saw.
+- **`bank_call` returns with B = the caller's ROM bank** (it saves the bank in B across the call). A caller
+  that keeps something in B must save it itself: the dialogue printer keeps its line start in B, and the
+  item-name lookup moved behind a `bank_call` (2026-11-27) put every line after an item name in a wrong
+  place (chest messages: "Inswas found!!"). Fixed in `dlg_nidx` (2026-11-28).
+- **The music engine's RAM page is `NES_RAM` = $DE00-$DEFF**, an `equ`, so `rammap.py` does not see it and
+  lists it as free. Nothing else may live there (the shrine people's script pointer briefly did).
