@@ -876,7 +876,20 @@ ts_key:     ld a, [btl_new]
             jr z, .k
             ld a, $98
             ld [S49], a
-.k:         ld a, b
+.k:         ld a, [BZ + $B1]                ; (one monster chosen: FF1's free targeting, the
+            and a                           ;   nearest living one in the pressed direction)
+            jr nz, .k0
+            ld a, [BZ + $AD]
+            and a
+            jr z, .k0
+            ld a, b
+            and $F0
+            jr z, .k0
+            push bc
+            call ts_free
+            pop bc
+            ret c
+.k0:        ld a, b
             cp $10
             jr z, .right
             cp $20
@@ -1146,6 +1159,180 @@ ts_chr:     ld a, [BZ + $B2]
             ld a, 4
             ld [BZ + $B1], a
             ret
+; FF1's free targeting (owner): from the monster at the grid place ($AF, $B0), the nearest living
+; one in direction A (R $10, L $20, U $40, D $80) by their centres on the screen (the distance
+; along the direction + twice the distance across); carry and chosen (ts_mon) if there is one,
+; else no carry and the place kept (FF3's own move follows: off the right edge, the party)
+TF         = btl_spr                        ; (scratch: cx, cy, best place, score lo / hi, the
+                                            ;   direction, the place kept, the place tried)
+ts_free:    ld [TF + 5], a
+            ld a, [BZ + $AF]
+            ld b, a
+            ld a, [BZ + $B0]
+            and 1
+            add a, a
+            add a, a
+            add a, b
+            ld [TF + 6], a
+            call ts_slot
+            ld [btl_k], a
+            call num_xy
+            ld a, b
+            ld [TF + 0], a
+            ld a, c
+            ld [TF + 1], a
+            ld a, $FF
+            ld [TF + 2], a
+            ld [TF + 3], a
+            ld [TF + 4], a
+            xor a
+.p:         ld [TF + 7], a
+            ld b, a
+            ld a, [TF + 6]
+            cp b
+            jr z, .nx
+            ld a, b
+            and 3
+            ld [BZ + $AF], a
+            ld a, b
+            rrca
+            rrca
+            and 1
+            ld [BZ + $B0], a
+            call ts_ok
+            jr nc, .nx
+            call ts_slot
+            ld [btl_k], a
+            call num_xy                     ; B = x, C = y
+            ld a, [TF + 0]                  ; D = |dx|, E = |dy|; H: bit 0 dx > 0, bit 1 dx < 0,
+            ld h, 0                         ;   bit 2 dy > 0, bit 3 dy < 0
+            ld l, a
+            ld a, b
+            sub l
+            jr z, .x0
+            jr c, .xn
+            ld d, a
+            set 0, h
+            jr .y
+.xn:        cpl
+            inc a
+            ld d, a
+            set 1, h
+            jr .y
+.x0:        ld d, 0
+.y:         ld a, [TF + 1]
+            ld l, a
+            ld a, c
+            sub l
+            jr z, .y0
+            jr c, .yn
+            ld e, a
+            set 2, h
+            jr .dir
+.yn:        cpl
+            inc a
+            ld e, a
+            set 3, h
+            jr .dir
+.y0:        ld e, 0
+.dir:       ld a, [TF + 5]                  ; in the direction? the score: along + 2 across
+            bit 4, a
+            jr z, .d1
+            bit 0, h
+            jr z, .nx
+            jr .sx
+.d1:        bit 5, a
+            jr z, .d2
+            bit 1, h
+            jr z, .nx
+.sx:        ld l, d                         ; (horizontal: along dx, across dy)
+            ld a, e
+            jr .sc
+.d2:        bit 6, a
+            jr z, .d3
+            bit 3, h
+            jr z, .nx
+            jr .sy
+.d3:        bit 2, h
+            jr z, .nx
+.sy:        ld l, e                         ; (vertical: along dy, across dx)
+            ld a, d
+.sc:        ld h, 0                         ; HL = along + 2 across
+            ld b, 0
+            ld c, a
+            add hl, bc
+            add hl, bc
+            ld a, [TF + 4]                  ; better than the best?
+            cp h
+            jr c, .nx
+            jr nz, .nb
+            ld a, [TF + 3]
+            cp l
+            jr c, .nx
+            jr z, .nx
+.nb:        ld a, l
+            ld [TF + 3], a
+            ld a, h
+            ld [TF + 4], a
+            ld a, [TF + 7]
+            ld [TF + 2], a
+.nx:        ld a, [TF + 7]
+            inc a
+            cp 8
+            jr nz, .p
+            ld a, [TF + 2]                  ; the best place
+            cp $FF
+            jr nz, .got
+            ld a, [TF + 6]                  ; none that way (FF1): right, the party (FF3's
+            call .set                       ;   move); up / down, the next living one in
+            ld a, [TF + 5]                  ;   order; left, the place kept
+            bit 4, a
+            jr z, .nr
+            call ts_chr
+            scf
+            ret
+.nr:        and $C0
+            jr z, .keep
+            ld a, [TF + 6]
+            ld [TF + 7], a
+            ld b, 7
+.cy:        push bc
+            ld a, [TF + 5]
+            bit 7, a
+            ld a, [TF + 7]
+            jr z, .cu
+            inc a
+            jr .cs
+.cu:        dec a
+.cs:        and 7
+            ld [TF + 7], a
+            call .set
+            call ts_ok
+            pop bc
+            jr c, .cf
+            dec b
+            jr nz, .cy
+            ld a, [TF + 6]
+            call .set
+.keep:      scf
+            ret
+.cf:        call ts_mon
+            scf
+            ret
+.got:       call .set
+            call ts_mon
+            scf
+            ret
+.set:       ld b, a
+            and 3
+            ld [BZ + $AF], a
+            ld a, b
+            rrca
+            rrca
+            and 1
+            ld [BZ + $B0], a
+            ret
+
 ; 32/9E03: one monster (the grid place)
 ts_mon:     call ts_slot
             call bitmask
