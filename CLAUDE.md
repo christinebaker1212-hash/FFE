@@ -121,27 +121,19 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   FF3 already has some of them: compare each in battle, keep FF3's where it is better, and adapt
   ours to FF3's style where they are about equal or ours has the edge.
 
-## Owner's decision for FF3 (2026-11-28; binding: core rewrite)
-- The first native FF3 build used the listing as a reference only, and its engine (main loop,
-  field, events, text, menus, battle input / screen) was our own design: owner: "plays like a
-  pre-alpha", "like a weird RPG Maker project". **Rewrite the core as a routine-by-routine
-  translation of FF3's own program from the listing:** FF3's routines, call structure, RAM
-  layout and control flow, each routine named by its address and checked against FF3's 6502
-  original (run from the user's ROM) on the same RAM state. Only the NES hardware layer (PPU /
-  APU / mapper writes) is replaced by Game Boy routines; 160x144 layouts come from changing FF3's
-  window positions / sizes, not its logic. Still no game code or data in the repo.
-- **Kept:** the battle rules (already such a translation, checked against FF3's code) and the
-  sound driver (checked frame by frame). **Extras** (Config, Suspend, conveniences, the owner's
-  screen choices) are built into the rewritten code as each part is done.
+## Owner's decision for FF3 (2026-11-28; binding: native port)
+- **FF3 is a native port, as FF1 was:** take FF3 on the NES, use the everything8215/ff3 disassembly
+  (`build/ref/ff3`, never committed), and write our own Game Boy Color engine from what it says FF3
+  does. **No recompilation, no emulation layer, no code translation** (owner, 2026-11-28). Every game
+  byte comes from the user's ROM at build time; FF3's rules, formulas, RNG, events and behaviour as on
+  the Famicom (checked against FF3's own code where it matters, as FF1's were).
+- **Built on FF1's native engine** (`tools/gbn/`, `docs/gb-native-reuse.md`, `docs/gb-lessons.md`):
+  its build skeleton, Game Boy modules and conveniences, with FF3's own game logic written from the
+  disassembly. The first FF3 engine (`tools/gb3n/src`, "plays like a pre-alpha") is replaced.
 - **The goal (owner, 2026-11-28):** a faithful but updated Final Fantasy III, as an official Nintendo
-  release might be: FF3's game as on the NES (the translated routines) with the FF1 native build's
-  updated mechanics and polish built on top.
-- **Native port (owner, 2026-11-28: "Native port, dammit!"):** hand translation only (no build-time
-  translator), and **no NES emulation layer of any kind**: no PPU / APU register shims. FF3's game
-  logic is translated from the listing; every routine that touches the PPU / APU / mapper becomes a
-  native Game Boy routine that works straight from FF3's RAM data (its buffers, positions, palettes)
-  and writes GB VRAM / OAM / palettes / sound registers itself.
-- Plan, RAM map, conventions and progress: `docs/ff3-gb-rewrite.md`.
+  release might be: FF3's game as on the NES, with the FF1 native build's updated mechanics and
+  polish.
+- Plan and progress: `docs/ff3-gb-rewrite.md`.
 
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
