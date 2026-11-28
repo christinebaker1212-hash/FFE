@@ -326,7 +326,19 @@ b_keys:     call wait_vbl
             jr .out
 .nr:        xor a
             ld [btl_rep], a
-.out:       ld a, c
+.out:       bit 0, b                        ; (FF1's quick selection: A held repeats, after 18
+            jr z, .na                       ;   frames, then every 6)
+            ld hl, btl_arep
+            inc [hl]
+            ld a, [hl]
+            cp 18
+            jr c, .ao
+            ld [hl], 12
+            set 0, c
+            jr .ao
+.na:        xor a
+            ld [btl_arep], a
+.ao:        ld a, c
             ld [btl_new], a
             ret
 
@@ -1355,3 +1367,6 @@ btl_tgt:    ds 1
 btl_px:     ds 1
 btl_py:     ds 1
 btl_str:    ds 32
+
+section wram, $C33A                         ; (bank 0 WRAM: free after the wipe's)
+btl_arep:   ds 1
