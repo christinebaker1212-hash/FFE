@@ -256,7 +256,10 @@ WA_TOP      = 1                             ;   curtains' top: the window off
 WA_BOT      = 2                             ;   curtains' bottom: the window on
 WA_SPL      = 3                             ;   split, the gap's bottom: the window off, SCY
 WA_S        = $80                           ;   (+ the sound after it)
-wp_vbl9:    xor a
+wp_vbl9:    ld a, [wp_on]                   ; (2: the menus' window gradient, gr_vbl)
+            cp 2
+            jp z, gr_vbl
+            xor a
             ld [wp_i], a
             ld [wp_n], a
             ldh [rWY], a
@@ -433,6 +436,7 @@ wp_stat9:   ld a, [wp_i]
 ; button (fix:ECAB). Each frame the page is drawn again from its start with the letters past
 ; tw_lim left blank (t_putc); blanks cost no time. tw_more: NZ if another page follows.
 TW_RATE    = 90
+TW_RT:      db 45, 64, TW_RATE, 140, 0
 tw_page9:   ld a, [t_bank]                  ; the page's start
             ld [tw_sb], a
             ld a, [t_ptr]
@@ -457,7 +461,14 @@ tw_page9:   ld a, [t_bank]                  ; the page's start
             call .draw
             call wait_vbl
             call read_pad
-            ld a, TW_RATE
+            ld a, [opt_txt]                 ; (Config's Text Speed: the rate; 5 = a page at once)
+            ld e, a
+            ld d, 0
+            ld hl, TW_RT
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .done
             ld b, a
             ldh a, [pad]
             bit 0, a                        ; (A held: twice as fast)
@@ -780,6 +791,59 @@ ring_fill:  ld a, [py]
             jr nz, .row
             ret
 
+; ---- the menus' window gradient (FF1's, owner 2026-11-28; ui.s builds it): wp_on = 2. Records in
+; WRAM 2 GR_REC (line, level; a level $FF ends: the frame's sound there), the ramp GR_RMP (16
+; colours, the fades applied). Each record: in the H-Blank before its line, colour 2 of BG
+; palettes 1-6 (the windows' fill) becomes its level's colour; LYC then the next record's line - 1.
+; The V-Blank puts level 0 (the windows' own colour) back and LYC at the first record.
+gr_vbl:     ldh a, [rSVBK]
+            ld [gr_svb], a
+            ld a, 2
+            ldh [rSVBK], a
+            xor a
+            ld [gr_i], a
+            ld hl, GR_RMP
+            ld a, [hl+]
+            ld b, a
+            ld d, [hl]
+            call gr_put
+            ld a, [GR_REC]                  ; LYC: the first record's line - 1
+            dec a
+            ldh [rLYC], a
+            ld a, 2                         ; (the STAT interrupt: LYC)
+            ldh [rIF], a
+            xor a
+            ldh [rIF], a
+            ldh a, [rLCDC]                  ; (the menu: the window on)
+            set 5, a
+            ldh [rLCDC], a
+            ld a, [gr_svb]
+            ldh [rSVBK], a
+            ret
+; colour B (low), D (high) -> colour 2 of BG palettes 1-6
+gr_put:     ld c, low(rBCPS)
+            ld a, $8C
+            call .one
+            ld a, $94
+            call .one
+            ld a, $9C
+            call .one
+            ld a, $A4
+            call .one
+            ld a, $AC
+            call .one
+            ld a, $B4
+.one:       ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ret
+section wram, $C6AC                         ; (after Config's settings)
+gr_i:       ds 1
+gr_svb:     ds 1
 section wram, $C321
 wp_on:      ds 1
 wp_top:     ds 1

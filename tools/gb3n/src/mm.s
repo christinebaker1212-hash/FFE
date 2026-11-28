@@ -158,10 +158,7 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
 .old2:      call mn_oldsub                  ; the screens not rebuilt yet: the earlier engine's
             jp .re
 .cfg:       call u_fadeout
-            ld a, CODE1
-            ld hl, opt_sub
-            call far_call
-            call mn_back
+            call cfg_open
             jp .re
 
 ; a member chosen on the party window (the hand at the picture) -> A = member, C if cancelled;
@@ -247,6 +244,7 @@ mn_order:   call mn_pick
 mn_oldsub:  push af
             push bc
             call u_fadeout
+            call u_groff                    ; (the earlier screens: their own palettes)
             call u_hoff
             call oam_hide
             pop bc
@@ -268,6 +266,8 @@ mn_back:    call u_fadeout
             ld de, u_palt
             ld bc, 128
             call memcpy
+            call u_wcol
+            call u_gron
             call u_mpal
             ld a, 1
             ld [menu_on], a

@@ -47,6 +47,8 @@ s16_bk     = $D64A              ;   (the bank before the build, the bottom key k
 s16_x      = $D64B
 S16_STG    = $D000              ; WRAM bank 6: the slots' composed tiles (56 x 32 -> VRAM bank 1 $00-$6F),
 S16_MIR    = $D800              ;   a mirror of VRAM bank 1 tiles $00-$7F
+GR_REC     = $D800              ; WRAM 2: the menus' window gradient (ui.s, text.s gr_stat)
+GR_RMP     = $D900
 GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
 N_ANIM     = $DD00              ; 3B/B41A animation frames (CGB attributes), 256 bytes (WRAM bank 1)
 N_RNG      = $CD00              ; fix:FE00 random number table
@@ -145,6 +147,9 @@ start:      di
             ld a, 4                         ; (facing down)
             ld [facing], a
             call snd_init
+            ld a, CODE11                    ; (Config's settings: cart RAM, else the defaults)
+            ld hl, cfg_load
+            call far_call
             call pal_up                     ; (black: nothing shows white)
             ld a, LCDC_ON
             ldh [rLCDC], a

@@ -131,7 +131,11 @@ def titles(rom, group_world):
 
 
 GB_WORDS = {'U_LV': 'LV', 'U_HP': 'HP', 'U_GIL': 'Gil', 'U_CAP': 'Capacity', 'U_CONFIG': 'Config',
-            'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove', 'U_COST': 'Cost'}
+            'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove', 'U_COST': 'Cost',
+            'U_TSPD': 'Text Speed', 'U_VOL': 'Volume', 'U_CTRL': 'Controls', 'U_WIN': 'Window',
+            'U_DEF0': 'Return to Default', 'U_DASH': 'B Dash', 'U_CURS': 'Cursor', 'U_RED': 'Red',
+            'U_GRN': 'Green', 'U_BLU': 'Blue', 'U_GRAD': 'Gradient', 'U_ON': 'On', 'U_OFFW': 'Off',
+            'U_REMEM': 'Remember', 'U_RESET': 'Reset'}
 
 
 def sight_data(rom, rgb555):
@@ -181,6 +185,8 @@ def code_data(rom, rgb555, group_world, bank, bank12):
     src += db('U_REM', text.encode(w['s_rem']) + b'\0')
     src += db('U_ATK', text.encode(w['s_atk'].rstrip('…').strip()) + b'\0')
     src += db('U_ARROW', bytes([ARROW, 0]))
+    v = rgb555(FILL)                                    # (Config: the default window colour, FF3's)
+    src += db('CF_WIN', bytes([v & 31, (v >> 5) & 31, (v >> 10) & 31]))
     def wrap(i):                                        # (FF3's message, re-wrapped to the window's
         raw = text.decode(text.raw_string(rom, 't8200', i)).replace('[77][79]', 'HP')
         keep = [clean(x) for x in raw.split('\n') if clean(x)]

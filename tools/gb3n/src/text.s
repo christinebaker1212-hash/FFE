@@ -482,9 +482,20 @@ stat_isr:   push af
             ld a, [wp_on]                   ; (a screen wipe: its edges, the sound after the last)
             and a
             jr z, .nw
+            cp 2                            ; (2: the menus' window gradient: gr_stat, here in
+            jr z, .gr                       ;   bank 0: it runs during the sound too)
             push bc
             push hl
             call wp_stat0
+            pop hl
+            pop bc
+            and a
+            jr nz, .x
+            pop af
+            reti
+.gr:        push bc
+            push hl
+            call gr_stat
             pop hl
             pop bc
             and a
@@ -501,14 +512,113 @@ stat_isr:   push af
             res 5, a
             ldh [rLCDC], a
 .x:         push bc                         ; then a frame of sound (once a frame, mid-screen:
-            push de                         ;   the V-Blank stays for the VRAM copies)
-            push hl
+            push de                         ;   the V-Blank stays for the VRAM copies; with the
+            push hl                         ;   interrupts on: a window gradient's lines meanwhile)
+            ei
             call snd_frame
             pop hl
             pop de
             pop bc
             pop af
             reti
+
+; the menus' window gradient (ui.s u_grbuild): the record due -> colour 2 of BG palettes 1-6 in the
+; H-Blank before its line; records already reached at once; a level $FF: the frame's sound (A = 1);
+; a line $FF: the end. LYC then at the next record's line - 1.
+gr_stat:    push de
+            ldh a, [rSVBK]
+            ld [gr_svb], a
+            ld a, 2
+            ldh [rSVBK], a
+            ld e, 0
+.rec:       ld a, [gr_i]
+            ld l, a
+            ld h, high(GR_REC)
+            ld a, [hl+]
+            cp $FF
+            jr z, .end
+            ld a, [hl+]
+            ld d, a
+            ld a, l
+            ld [gr_i], a
+            ld a, d
+            cp $FF
+            jr nz, .col
+            ld e, 1
+            jr .next
+.col:       add a, a
+            ld l, a
+            ld h, high(GR_RMP)
+            ld a, [hl+]
+            ld b, a
+            ld d, [hl]
+            ld c, low(rBCPS)
+.w:         ldh a, [rSTAT]
+            and 3
+            jr nz, .w
+            ld a, $8C
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ld a, $94
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ld a, $9C
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ld a, $A4
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ld a, $AC
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+            dec c
+            ld a, $B4
+            ld [c], a
+            inc c
+            ld a, b
+            ld [c], a
+            ld a, d
+            ld [c], a
+.next:      ld a, [gr_i]
+            ld l, a
+            ld h, high(GR_REC)
+            ld a, [hl]
+            dec a
+            ld b, a
+            ldh a, [rLY]
+            cp b
+            jr nc, .rec
+            ld a, b
+            ldh [rLYC], a
+.end:       ld a, [gr_svb]
+            ldh [rSVBK], a
+            ld a, e
+            pop de
+            ret
 
 section wram, $CE00
 win_buf:    ds 32 * WIN_ROWS                ; (page-aligned: DMA source)

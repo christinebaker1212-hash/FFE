@@ -695,6 +695,147 @@ m_msgbox:   push af
             call cur_hide
             jp wait_keys
 
+; fix:E917: the tile in front (E, D) is a locked door ($90-$9F) or a treasure ($D0-$DF chests,
+; $E0-$EF hidden ones, only while their switch is on) -> fix:E982 / F549, a message
+treasure9:  push de
+            call map_at
+            pop de
+            ld [tr_t], a
+            ld l, a
+            ld h, high(M_P1)
+            bit 7, [hl]
+            ret z
+            inc h
+            ld a, [hl]
+            and $0F
+            ld [tr_n2], a
+            ld a, [tr_t]
+            cp $90
+            ret c
+            cp $A0
+            jr c, .locked
+            cp $D0
+            ret c
+            cp $F0
+            ret nc
+            ld a, e
+            ld [tr_x], a
+            ld a, d
+            ld [tr_y], a
+            ld a, [tr_t]
+            cp $E0
+            jr c, .give
+            ld a, [tr_n2]                   ; (hidden: only if still there)
+            call tr_open
+            ret nz
+.give:      ld a, [tr_n2]                   ; the treasure id -> its contents (01/9C00 / 9D00)
+            add a, low(M_TT)
+            ld l, a
+            ld h, high(M_TT)
+            ld a, [hl]
+            ld [tr_id2], a
+            ld l, a
+            ld h, $40
+            ld a, [cur_world]
+            and a
+            jr z, .c0
+            inc h
+.c0:        ld a, GAME_BANK                 ; (read through bank 0: this code is banked)
+            call rd_byte
+            ld [t_item], a
+            ld a, [tr_t]                    ; a chest on a map whose chests hold gil
+            cp $E0
+            jr nc, .item
+            ld a, [M_ENT + 10]
+            and $20
+            jr z, .item
+            ld a, [t_item]                  ; gil: the item's price (fix:F5B2; text.s item_price,
+            ld l, a                         ;   through bank 0)
+            ld h, 0
+            add hl, hl
+            ld de, $4200
+            add hl, de
+            ld a, GAME_BANK
+            call rd_byte
+            ld e, a
+            ld a, GAME_BANK
+            call rd_byte
+            ld d, a
+            ld c, 0
+            call gil_add
+            call .toggle
+            ld a, $01
+            jr .msg
+.item:      ld a, [t_item]                  ; an item: 1 (arrows $4F-$56: 20)
+            ld [ev_par], a
+            ld b, 1
+            cp $4F
+            jr c, .q
+            cp $57
+            jr nc, .q
+            ld b, 20
+.q:         ld a, b
+            ld [tr_q], a
+            call ev_find                    ; (3C/937E)
+            ld a, $50                       ; "Can't carry anymore." (no change)
+            jr c, .show
+            ld a, [t_item]
+            ld [hl], a
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [tr_q]
+            add a, [hl]
+            cp 99
+            jr c, .q99
+            ld a, 99
+.q99:       ld [hl], a
+            call .toggle
+            ld a, [tr_t]
+            cp $E0
+            ld a, $76                       ; (not a chest)
+            jr nc, .show
+            ld a, [tr_id2]
+            cp $E0
+            ld a, $59                       ; "Found ...!"
+            jr c, .msg
+            ld a, [tr_id2]                  ; (FF3 F5A1: the treasure id is the battle, after
+            ld [act_id], a                  ;   "Found ...! A monster appeared!")
+            ld a, $20
+            ld [act], a
+            ld a, $02
+.msg:       push af                         ; a chest: opened ($7D) and redrawn
+            ld a, [tr_x]
+            ld e, a
+            ld a, [tr_y]
+            ld d, a
+            push de
+            call map_at
+            ld [hl], $7D
+            pop de
+            call q_mt
+            pop af
+.show:      ld c, a
+            ld a, 1
+            jp dlg_show
+.toggle:    ld a, [tr_id2]
+            call tr_sw
+            ld a, [hl]
+            xor b
+            ld [hl], a
+            ret
+.locked:    ld a, [GS + $0E]                ; the showing character a Thief (job 8): unlocked
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            cp 8
+            ld a, $03                       ; "Locked."
+            jr nz, .show
+            ld hl, GS + $21
+            set 6, [hl]
+            ld a, $7A
+            jr .show
+
 section wram, $C6C0
 it_cur:     ds 1
 it_top:     ds 1

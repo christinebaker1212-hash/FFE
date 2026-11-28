@@ -67,8 +67,11 @@ six:        push bc
 snd_frame:  ld a, [snd_on]
             and a
             ret z
+            ld a, [rom_bank]                ; (the shadow too: an interrupt taken meanwhile puts
+            push af                         ;   this bank back, not the interrupted code's)
             ld a, [snd_bank]
-            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
+            ld [rom_bank], a
+            ld [$2100], a                   ; (MBC5 ROM bank)
             ld a, [S43]                     ; (song $37: no effects)
             cp $37
             jr nz, .fx
@@ -85,8 +88,9 @@ snd_frame:  ld a, [snd_on]
             and $7F
             or b
             ld [S40], a
-            ld a, [rom_bank]
-            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
+            pop af
+            ld [rom_bank], a
+            ld [$2100], a
             ret
 
 ; play song A (FF3: $7F43 = A, $7F42 = 1; the driver takes the song's bank when it starts it)

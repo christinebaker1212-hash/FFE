@@ -14,6 +14,11 @@ U_ZERO     = $45                ; black
 U_T0       = $48                ; the text pool ($48-$FF)
 U_NPOOL    = 184
 U_BUF      = $D000              ; WRAM 7: the pool's tiles
+GR_WIN     = $D940              ; (WRAM 2: the windows' top row, height; 8 at most)
+GR_NW      = $D950
+GR_BASE    = $D960              ;   the ramp (16 x RGB555)
+GR_TMP     = $DC00              ;   the records being built (then copied under DI)
+U_FBUF     = $D9A0              ; (WRAM 2: u_fstr's string, 96 bytes)
 U_LINE     = $DE00              ; WRAM 2: a line's 1-bit rows (8 a tile, 20 tiles)
 u_palt     = $DF00              ; WRAM 2: the fades' target palettes (BG 0-7, OBJ 0-7)
 u_nbuf     = $DF80              ; WRAM 2: an item's name (17)
@@ -41,6 +46,8 @@ u_open:     call u_fadeout
             ld de, u_palt
             ld bc, 128
             call memcpy
+            call u_wcol                     ; (Config's window colour, the gradient)
+            call u_gron
             jp u_mpal
 
 ; the field back: faded out, its tiles and palettes restored, faded in (u_closeb: left black, for
@@ -52,6 +59,7 @@ u_close:    call u_closeb
             ldh [rSVBK], a
             ret
 u_closeb:   call u_fadeout
+            call u_groff
             call oam_hide
             xor a
             ld [menu_on], a
@@ -318,6 +326,7 @@ u_pstep:    ld [u_k], a
             pop bc
             dec b
             jr nz, .c
+            call u_grramp                   ; (the gradient's colours at this step)
             call u_svr
             ld a, 1
             ldh [pal_dirty], a
@@ -430,10 +439,25 @@ u_cls:      ld a, 2
             ld [u_pool], a
             ld [u_dlo], a
             ld [u_dhi], a
+            ld [GR_NW], a                   ; (the gradient's windows: none yet)
             ret
 
-; a window: B, C = left, top cell; D, E = width, height
-u_box:      push bc
+; a window: B, C = left, top cell; D, E = width, height (its rows kept for the gradient)
+u_box:      ld a, [GR_NW]
+            cp 8
+            jr nc, .ng
+            push hl
+            add a, a
+            add a, low(GR_WIN)
+            ld l, a
+            ld h, high(GR_WIN)
+            ld [hl], c
+            inc l
+            ld [hl], e
+            ld hl, GR_NW
+            inc [hl]
+            pop hl
+.ng:        push bc
             push de
             ld a, U_FR                      ; top row
             call u_cell
@@ -1041,15 +1065,296 @@ u_flush:    ld a, [u_dlo]
 .map:       ld a, [u_tonly]
             and a
             ret nz
+            call u_grbuild                  ; (the gradient for these windows)
             ld a, 1
             ld [m_dirty], a
             call wait_vbl
             call wait_vbl
             jp wait_vbl
 
+; ---- the windows' colour and gradient (Config; FF1's): u_palt BG 1-6 colour 2 = the colour,
+; colour 0 (the letters' shadow, the frame's outer line) = a quarter of it; the ramp GR_BASE: 16
+; levels from the colour down to a third. u_gron: the gradient on (wp_on = 2) if Config has it.
+u_wcol:     call u_sv2
+            ld a, [win_r]                   ; DE = the colour
+            ld e, a
+            ld a, [win_g]
+            call .g
+            ld a, [win_b]
+            add a, a
+            add a, a
+            or d
+            ld d, a
+            push de
+            ld a, [win_r]                   ; BC = a quarter of it
+            srl a
+            srl a
+            ld e, a
+            ld a, [win_g]
+            srl a
+            srl a
+            call .g
+            ld a, [win_b]
+            srl a
+            srl a
+            add a, a
+            add a, a
+            or d
+            ld b, a
+            ld c, e
+            pop de
+            ld hl, u_palt + 8               ; BG 1-6
+            ld a, 6
+.p:         push af
+            ld [hl], c
+            inc hl
+            ld [hl], b
+            inc hl
+            inc hl
+            inc hl
+            ld [hl], e
+            inc hl
+            ld [hl], d
+            inc hl
+            inc hl
+            inc hl
+            pop af
+            dec a
+            jr nz, .p
+            ld hl, GR_BASE                  ; the ramp: level l = the colour x (45 - 2 l) / 45
+            ld c, 0
+.r:         push bc
+            push hl
+            ld a, c
+            ld b, a
+            ld a, [win_r]
+            call .f
+            ld e, a
+            ld a, [win_g]
+            call .f
+            call .g
+            ld a, [win_b]
+            call .f
+            add a, a
+            add a, a
+            or d
+            ld d, a
+            pop hl
+            ld [hl], e
+            inc hl
+            ld [hl], d
+            inc hl
+            pop bc
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .r
+            jp u_svr
+.g:         ld d, a                         ; E |= g << 5, D = g >> 3
+            swap a
+            add a, a
+            and $E0
+            or e
+            ld e, a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            ld d, a
+            ret
+.f:         push de                         ; A x (45 - 2 B) / 45 (A 0-31)
+            push bc
+            push hl
+            ld e, a
+            ld d, 0
+            ld a, b
+            add a, a
+            cpl
+            add a, 46                       ; 45 - 2 l
+            ld b, a
+            ld hl, 0
+.m:         add hl, de
+            dec b
+            jr nz, .m
+            ld e, 0                         ; / 45
+.dv:        ld a, l
+            sub 45
+            ld l, a
+            ld a, h
+            sbc 0
+            ld h, a
+            jr c, .dd
+            inc e
+            jr .dv
+.dd:        ld a, e
+            pop hl
+            pop bc
+            pop de
+            ret
+; the ramp at the fade's step u_k -> GR_RMP (WRAM 2 selected)
+u_grramp:   ld hl, GR_BASE
+            ld de, GR_RMP
+            ld a, 16
+.l:         push af
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld b, a
+            push hl
+            push de
+            call u_scale
+            pop de
+            ld a, l
+            ld [de], a
+            inc de
+            ld a, h
+            ld [de], a
+            inc de
+            pop hl
+            pop af
+            dec a
+            jr nz, .l
+            ret
+; the gradient on when Config has it (the UI showing), else off
+u_gron:     ld a, [opt_grad]
+            and a
+            jr nz, u_groff
+            ld a, 2
+            ld [wp_on], a
+            ret
+u_groff:    ld a, [wp_on]                   ; (off: the frame's sound at its own line again)
+            cp 2
+            ret nz
+            xor a
+            ld [wp_on], a
+            ld a, WIN_LINE - 1
+            ldh [rLYC], a
+            ret
+; the records for the windows drawn (GR_WIN): each line takes the outermost window over it (the
+; smallest top row); its level from 3 lines into that window's top to 3 lines before its bottom
+u_grbuild:  call u_sv2
+            ld hl, GR_TMP
+            xor a
+            ld [u_gry], a
+            dec a
+            ld [u_grp], a                   ; (the level before: none)
+.y:         ld a, [u_gry]                   ; (line 48: the frame's sound, mid-screen as
+            cp 48                           ;   without the gradient)
+            jr nz, .ns
+            ld [hl+], a
+            ld [hl], $FF
+            inc hl
+.ns:        push hl
+            call .lvl
+            pop hl
+            ld b, a
+            ld a, [u_grp]
+            cp b
+            jr z, .n
+            ld a, b
+            ld [u_grp], a
+            ld a, [u_gry]
+            and a
+            jr z, .n                        ; (line 0: the V-Blank's level 0)
+            ld [hl+], a
+            ld [hl], b
+            inc hl
+            ld a, l
+            cp 250
+            jr nc, .e
+.n:         ld a, [u_gry]
+            inc a
+            ld [u_gry], a
+            cp 141
+            jr nz, .y
+.e:         ld a, $FF                       ; (the end)
+            ld [hl+], a
+            ld [hl], a
+            di
+            ld hl, GR_TMP
+            ld de, GR_REC
+            ld bc, 256
+            call memcpy
+            ei
+            jp u_svr
+.lvl:       ld a, [u_gry]                   ; A = line y's level
+            srl a
+            srl a
+            srl a
+            ld c, a                         ; its row
+            ld b, $FF                       ; (the best top)
+            ld hl, GR_WIN
+            ld a, [GR_NW]
+            and a
+            ret z
+            ld e, a
+            ld d, 0                         ; (the best height)
+.w:         ld a, [hl+]                     ; top
+            push hl
+            ld l, [hl]                      ; height
+            ld h, a
+            ld a, c
+            cp h
+            jr c, .wn                       ; row < top
+            ld a, h
+            add a, l
+            dec a
+            cp c
+            jr c, .wn                       ; row > top + h - 1
+            ld a, h
+            cp b
+            jr nc, .wn
+            ld b, h
+            ld d, l
+.wn:        pop hl
+            inc hl
+            dec e
+            jr nz, .w
+            ld a, b
+            cp $FF
+            jr nz, .got
+            xor a
+            ret
+.got:       add a, a                        ; start = 8 top + 3
+            add a, a
+            add a, a
+            add a, 3
+            ld c, a
+            ld a, [u_gry]
+            sub c
+            jr nc, .t
+            xor a
+            ret
+.t:         ld l, a                         ; t * 16 / (8 h - 6)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            sub 6
+            ld c, a
+            ld b, 0
+            ld e, 0
+.dv:        ld a, l
+            sub c
+            ld l, a
+            ld a, h
+            sbc b
+            ld h, a
+            jr c, .dd
+            inc e
+            ld a, e
+            cp 15
+            jr c, .dv
+.dd:        ld a, e
+            ret
+
 ; string A of table HL in bank CODE12 (ui.py: place names, FF3's messages) -> U_FBUF (WRAM 2),
 ; HL = U_FBUF
-U_FBUF     = $D9A0              ; (WRAM 2: 96 bytes)
 u_fstr:     ld e, a
             ld d, 0
             add hl, de
@@ -1205,3 +1510,5 @@ u_eres:     ds 1
 eqx_lo:     ds 1
 eqx_hi:     ds 1
 u_pm:       ds 1                            ; (u_mjob: the member whose job-0 colours)
+u_gry:      ds 1                            ; (u_grbuild: the line, the level before)
+u_grp:      ds 1
