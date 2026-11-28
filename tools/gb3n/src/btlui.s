@@ -827,8 +827,8 @@ ts_show:    ld a, [BZ + $AD]
             add a, low(oam_buf)
             ld l, a
             ld h, high(oam_buf)
-            ld a, [hl+]
-            sub 16 - 4
+            ld a, [hl+]                     ; (the finger at the member's middle: its top + 12)
+            sub 16 - 9
             ld c, a
             ld a, [hl]
             sub 8 + 16
@@ -1481,8 +1481,8 @@ mon_cursor: call pos_ptr
             add a, a
             add a, a
             add a, c
-            sub 8
-            ld c, a
+            sub 3                           ; (the finger, 3 lines into the hand, at the
+            ld c, a                         ;   monster's middle: owner)
             ld a, [btl_px]
             add a, a
             add a, a
