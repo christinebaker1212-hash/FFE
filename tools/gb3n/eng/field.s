@@ -1633,6 +1633,26 @@ q_feed:     ld c, 1
             jr nz, .l
             ret
 
+; q_mt for a tile changed on the map: only if inside the BG ring's 16 x 16 around the party (a tile
+; outside would land on a column / row that shows another one)
+q_mt_vis:   ld a, [px]
+            ld b, a
+            ld a, e
+            sub b
+            add a, 7
+            and 63
+            cp 16
+            ret nc
+            ld a, [py]
+            ld b, a
+            ld a, d
+            sub b
+            add a, 7
+            and 63
+            cp 16
+            ret nc
+            jr q_mt
+
 ; queue metatile (E = x, D = y), coordinates mod 64; entry: VRAM address, UL UR DL DR, palette
 q_mt:       ldh a, [maptype]                ; (normal maps: mod 64; the world map: 256)
             and a

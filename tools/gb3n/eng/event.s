@@ -235,26 +235,45 @@ ev_d5:      ld hl, SV + $130                ; (8 levels: current = max)
             jr nz, .c
             ret
 
-; $D6 / $D7: the passage opens: the tile in front becomes $5B / $5C (3B/B8A6)
+; $D6 / $D7: a passage opens (3B/B8A6): the map's first tile $5B (floor) / $5C (wall) becomes the
+; tile + 2, drawn
 ev_d6:      ld a, $5B
             jr ev_d67
 ev_d7:      ld a, $5C
-ev_d67:     push af
-            ld a, [z33]
-            call dir_dxy
-            ld a, [px]
-            add a, b
-            and 63
+ev_d67:     ld c, a
+            ld a, 2
+            ldh [rSVBK], a
+            ld hl, W_MAP
+.l:         ld a, [hl]
+            cp c
+            jr z, .f
+            inc hl
+            ld a, h
+            cp high(W_MAP) + 4
+            jr nz, .l
+            ld a, 1
+            ldh [rSVBK], a
+            ret
+.f:         add a, 2
+            ld [hl], a
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, l                         ; x = offset & 31, y = offset / 32
+            and 31
             ld e, a
-            ld a, [py]
-            add a, c
-            and 63
+            ld a, l                         ; y = (h - map) << 3 | l >> 5
+            swap a
+            rrca
+            and 7
+            ld b, a
+            ld a, h
+            sub high(W_MAP)
+            add a, a
+            add a, a
+            add a, a
+            or b
             ld d, a
-            pop af
-            push de
-            call map_set
-            pop de
-            jp q_mt
+            jp q_mt_vis
 
 ; $DB / $DC: the prologue / epilogue (FF3 $50 = $80 / $81)
 ev_db:      ld a, $80
@@ -652,8 +671,6 @@ ts_npc:     ld hl, TS7B
             ld bc, 32
             call memcpy
 ; FF3 check trigger script (3C/9319): the first conditional met -> z6C = its event id
-ts_check1:  ld hl, TS7B + 1                 ; (3C/92EE: an item script, past its person)
-            jr ts_check.l
 ts_check:   ld hl, TS7B
 .l:         ld a, [hl+]
             cp $FF
@@ -679,6 +696,8 @@ ts_check:   ld hl, TS7B
             jr nz, .skip
             inc hl
             jr .l
+ts_check1:  ld hl, TS7B + 1                 ; (3C/92EE: an item script, past its person)
+            jr ts_check.l
 ; Z: event switch (C & $7F) clear
 ev_swchk:   ld a, c
             and $7F
