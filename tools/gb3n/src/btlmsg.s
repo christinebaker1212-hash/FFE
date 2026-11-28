@@ -463,10 +463,7 @@ sc_num:     ld a, [ba_dirty]                ; (an animation used their tiles: lo
 .show:      ld a, [btl_n2]
             and a
             jr z, .done
-            ld b, 40
-.w:         call wait_vbl
-            dec b
-            jr nz, .w
+            call num_hop
             ld a, [btl_k]
             cp 12
             jr nz, .batch
@@ -520,6 +517,81 @@ num_ent:    ld a, [btl_k]
             ld d, [hl]
             ret
 .no:        ld de, $FFFF
+            ret
+
+; 33/AD5C: the numerals hop: 32 frames, the phase 8 a frame, the height sin(phase & $7F) x the
+; amplitude / 256 (10/9A80), the amplitude $40 for 16 frames, then $10 (two hops)
+num_hop:    ld hl, NUM_OAM                  ; (the resting lines: btl_spr)
+            ld de, btl_spr
+            ld b, 16
+.cy:        ld a, [hl+]
+            ld [de], a
+            inc de
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .cy
+            xor a
+            ld [btl_tmp + 2], a             ; (the phase)
+            ld c, 0                         ; C = the frame
+.f:         ld a, [btl_tmp + 2]
+            add a, 8
+            ld [btl_tmp + 2], a
+            and $7F
+            ld l, a
+            ld h, 0
+            push bc
+            ld bc, CUT_SINE
+            add hl, bc
+            ld a, CUTD
+            call rd_byte
+            pop bc
+            ld e, a                         ; E = sin (0-127)
+            ld a, c
+            cp 16
+            ld d, $40
+            jr c, .am
+            ld d, $10
+.am:        ld b, 8                         ; H = E x D >> 8
+            xor a
+            ld h, a
+            ld l, a
+.ml:        add hl, hl
+            sla d
+            jr nc, .mn
+            push de
+            ld d, 0
+            add hl, de
+            pop de
+.mn:        dec b
+            jr nz, .ml
+            ld b, h                         ; B = the height
+            ld hl, NUM_OAM
+            ld de, btl_spr
+            push bc
+            ld c, 16
+.sp:        ld a, [de]
+            inc de
+            and a
+            jr z, .sn                       ; (unused)
+            sub b
+.sn:        ld [hl+], a
+            inc hl
+            inc hl
+            inc hl
+            dec c
+            jr nz, .sp
+            pop bc
+            call wait_vbl
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .f
+            ld b, 8                         ; (a pause at rest)
+.w:         call wait_vbl
+            dec b
+            jr nz, .w
             ret
 
 num_clear:  ld hl, NUM_OAM
