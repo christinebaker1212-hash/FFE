@@ -289,8 +289,8 @@ main:       call wait_vbl
             jr nz, .nt
             xor a
             ld [tst_choc], a
-            ld a, CODE1
-            ld hl, choc_open
+            ld a, CODE13
+            ld hl, choc13
             call far_call
             jr main
 ; [/TEST]

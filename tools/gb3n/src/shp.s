@@ -9,6 +9,8 @@ SP_LP      = 70                 ; pool: 0-39 the message, 40-59 the choices and 
 SP_LR      = 14                 ;   70 + 14 k the list's row k
 
 shp_open:   call u_open
+            xor a
+            ld [sp_kind], a
             ld a, 5
             ld [sp_crow], a
             ld a, 40
@@ -226,6 +228,161 @@ shp_open:   call u_open
 .s2:        call sp_mdraw
             call u_flush
             jp .sl
+
+; ---- the fat chocobo (3D/B383, rebuilt): Deposit / Withdraw / Exit; Deposit: the bag, A puts a
+; slot in his storage; Withdraw: the stored items, A takes one back (FF3's rules: shop.s ch_give /
+; ch_take; his messages $51-$58)
+choc13:     call u_open
+            ld a, 1
+            ld [sp_kind], a
+            xor a
+            ld [sh_ev], a
+            ld a, 5
+            ld [sp_crow], a
+            ld a, 40
+            ld [sp_cpool], a
+            ld a, 8                         ; Yooo, need somethiiing?
+            ld [sp_msg], a
+            xor a
+            ld [sp_ch], a
+            ld [sh_mode], a
+            call sp_scr
+            ld a, 4
+            ld [sp_set], a
+            call sp_cdraw
+            ld a, 2                         ; (the list empty first)
+            ld [sh_mode], a
+            call sp_list
+            call u_flush
+            call u_fadein
+.top:       ld a, 4
+            ld [sp_set], a
+            call sp_cdraw
+            call u_flush
+            call sp_choose
+            jr c, .x
+            cp 2
+            jr z, .x
+            and a
+            jr nz, .take
+            ld a, 9                         ; Whatcha gonna give meee?
+            ld [sp_msg], a
+            ld a, 1
+            jr .list
+.take:      ld a, CODE1
+            ld hl, ch_build
+            call far_call
+            ld a, 10                        ; Whaddaya want, ya saaay?
+            ld [sp_msg], a
+            ld a, 3
+.list:      ld [sh_mode], a
+            xor a
+            ld [sh_cur], a
+            ld [sh_top], a
+            call sp_mdraw
+            call sp_list
+            call u_flush
+.l:         call sp_park
+            ld a, [sh_cur]
+            ld b, a
+            ld a, [sh_top]
+            ld c, a
+            ld a, b
+            sub c
+            add a, SP_ROW
+            ld c, a
+            ld b, 3
+            call u_hand
+            call wait_vbl
+            call u_keys
+            ld a, [m_new]
+            bit 1, a
+            jr nz, .lb
+            bit 0, a
+            jr nz, .la
+            ld b, a
+            ld a, [sh_cur]
+            bit 6, b
+            jr z, .ld
+            and a
+            jr z, .l
+            dec a
+            ld [sh_cur], a
+            call sp_mv
+            ld b, a
+            ld a, [sh_top]
+            cp b
+            jr c, .l
+            jr z, .l
+            ld a, b
+            ld [sh_top], a
+            call sp_list
+            call u_flush
+            jr .l
+.ld:        bit 7, b
+            jr z, .l
+            ld c, a                         ; (the last: the bag 31, the storage its count - 1)
+            ld b, 31
+            ld a, [sh_mode]
+            cp 3
+            jr nz, .lm
+            ld a, [ch_n]
+            and a
+            jr z, .l
+            dec a
+            ld b, a
+.lm:        ld a, c
+            cp b
+            jr nc, .l
+            inc a
+            ld [sh_cur], a
+            call sp_mv
+            ld b, a
+            ld a, [sh_top]
+            add a, 7
+            cp b
+            jr nc, .l
+            ld a, b
+            sub 7
+            ld [sh_top], a
+            call sp_list
+            call u_flush
+            jp .l
+.lb:        call sp_ok
+            call sp_poff
+            ld a, 8
+            ld [sp_msg], a
+            call sp_mdraw
+            ld a, 2
+            ld [sh_mode], a
+            call sp_list
+            jp .top
+.la:        ld a, [sh_msg]                  ; (FF3's outcome: its message)
+            ld [sp_t], a
+            ld a, [sh_mode]
+            cp 1
+            ld hl, ch_give
+            jr z, .do
+            ld hl, ch_take
+.do:        ld a, CODE1
+            call far_call
+            ld a, [sh_mode]                 ; (withdrawn: the storage's list again)
+            cp 3
+            jr nz, .m
+            ld a, CODE1
+            ld hl, ch_build
+            call far_call
+.m:         ld a, [sh_msg]
+            call sp_msgid
+            call sp_mdraw
+            call sp_list
+            call u_flush
+            jp .l
+.x:         call sp_ok
+            call u_fadeout
+            call u_hoff
+            call sp_poff
+            jp u_close
 
 ; ---- the inn (3C/8E8D, rebuilt): the innkeeper's words with the cost (0,0,20,8), the party's
 ; pictures and HP (0,8,20,6), Yes / No and the Gil (0,14,20,4); Yes: FF3's stay (shop.s shx_istay:
@@ -488,19 +645,21 @@ in_gil:     ld bc, $0C0F                    ; Gil at the right of the choices' r
 ; FF3's message id A (shop.s's sh_msg) -> sp_msg (SP_MSG's order: $26, $27, $28, $29, $2A, $2B, $2C,
 ; $6C)
 sp_msgid:   ld hl, SP_MIDS
+            ld b, a
             ld c, 0
-.f:         cp [hl]
+.f:         ld a, b
+            cp [hl]
             jr z, .x
             inc hl
             inc c
             ld a, c
-            cp 8
+            cp 16
             jr nz, .f
             ld c, 2
 .x:         ld a, c
             ld [sp_msg], a
             ret
-SP_MIDS:    db $26, $27, $28, $29, $2A, $2B, $2C, $6C
+SP_MIDS:    db $26, $27, $28, $29, $2A, $2B, $2C, $6C, $51, $52, $53, $54, $55, $56, $57, $58
 
 sp_ok:      ld a, $85
             ld [S49], a
@@ -525,6 +684,9 @@ sp_scr:     call oam_hide
             call u_box
             call sp_mdraw
             call sp_gil
+            ld a, [sp_kind]                 ; (the fat chocobo: no name)
+            and a
+            ret nz
             ld a, 60                        ; the shop's name (types 7-10)
             ld [u_pool], a
             ld a, UP_LABEL
@@ -682,18 +844,30 @@ sp_cdraw:   ld a, [sp_crow]
             call sp_str                     ; (count, then the words)
             ld a, [hl+]
             ld [sp_n], a
+            ld de, sp_cols                  ; (the words' cells)
+            ld b, 3
+.cc:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cc
+            xor a
+            ld [sp_t], a
+.w:         ld a, [sp_t]
+            add a, low(sp_cols)
+            ld e, a
+            ld d, high(sp_cols)
+            ld a, [de]
+            ld b, a
             ld a, [sp_crow]
             ld c, a
-            ld b, 3
-.w:         push bc
             call u_text
-            pop bc
-            ld a, b
-            add a, 5
+            ld a, [sp_t]
+            inc a
+            ld [sp_t], a
             ld b, a
             ld a, [sp_n]
-            dec a
-            ld [sp_n], a
+            cp b
             jr nz, .w
             ld a, 1
             ld [m_dirty], a
@@ -704,12 +878,7 @@ sp_choose:  ld a, [sp_set]
             call sp_str
             ld a, [hl]
             ld [sp_n], a
-.l:         ld a, [sp_ch]
-            ld b, a
-            add a, a
-            add a, a
-            add a, b
-            add a, 3
+.l:         call sp_chc
             ld b, a
             ld a, [sp_crow]
             ld c, a
@@ -748,12 +917,7 @@ sp_choose:  ld a, [sp_set]
             and a
             ret
 ; the parked hand at the choice (OAM 24-27) while the list is chosen from
-sp_park:    ld a, [sp_ch]
-            ld b, a
-            add a, a
-            add a, a
-            add a, b
-            add a, 3
+sp_park:    call sp_chc
             add a, a
             add a, a
             add a, a
@@ -765,6 +929,13 @@ sp_park:    ld a, [sp_ch]
             ld c, a
             ld hl, oam_buf + 4 * 24
             jp u_handh
+; the cell of choice sp_ch -> A
+sp_chc:     ld a, [sp_ch]
+            add a, low(sp_cols)
+            ld l, a
+            ld h, high(sp_cols)
+            ld a, [hl]
+            ret
 sp_poff:    ld hl, oam_buf + 4 * 24
             ld b, 4
             xor a
@@ -811,6 +982,10 @@ sp_row:     ld a, [sh_k]
             ld a, UP_WHITE
             ld [u_pal], a
             ld a, [sh_mode]
+            cp 2
+            ret z                           ; (2: none)
+            cp 3
+            jr z, .sto
             and a
             jr nz, .inv
             ld a, [sh_k]
@@ -839,6 +1014,33 @@ sp_row:     ld a, [sh_k]
             ld d, a
             ld c, [hl]
             call sp_n24
+            ld a, [sh_k]
+            add a, SP_ROW
+            ld c, a
+            ld b, 19
+            jp u_textr
+.sto:       ld a, [sh_top]                  ; (the fat chocobo's storage: ch_list, $6300 + id)
+            ld b, a
+            ld a, [sh_k]
+            add a, b
+            ld l, a
+            ld h, high(ch_list)
+            ld a, [hl]
+            and a
+            ret z
+            push af
+            call u_iname
+            ld a, [sh_k]
+            add a, SP_ROW
+            ld c, a
+            ld b, 3
+            call u_text
+            pop af
+            ld l, a
+            ld h, high(GS + $300)
+            ld e, [hl]
+            ld d, 0
+            call u_ntoa
             ld a, [sh_k]
             add a, SP_ROW
             ld c, a
@@ -883,3 +1085,5 @@ sp_nb:      ds 16
 sp_crow:    ds 1
 sp_t:       ds 1
 sp_cpool:   ds 1
+sp_kind:    ds 1
+sp_cols:    ds 3

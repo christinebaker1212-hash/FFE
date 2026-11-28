@@ -83,6 +83,16 @@ def ui_data(rom):
     t = lambda i: text.decode(text.raw_string(rom, 't8200', i))
     def lines_(raw):
         return b'\x01'.join(text.encode(ui.clean(x)) for x in raw.split('\n') if ui.clean(x))
+    def wrap144(raw):
+        if all(ui.width(text.encode(ui.clean(x))) <= 144 for x in raw.split('\n')):
+            return lines(raw)
+        lns, cur = [], []
+        for wd in ui.clean(raw).split(' '):
+            if cur and ui.width(text.encode(' '.join(cur + [wd]))) > 144:
+                lns.append(' '.join(cur)); cur = []
+            cur.append(wd)
+        lns.append(' '.join(cur))
+        return b'\x01'.join(text.encode(x) for x in lns)
     def lines(raw):
         return b'\x01'.join(text.encode(ui.clean(x)) for x in raw.split('\n') if ui.clean(x))
     def strtab(label, items):
@@ -91,6 +101,7 @@ def ui_data(rom):
             out += '%s_%d:\n    db %s\n' % (label, k, ', '.join(str(v) for v in bytes(b) + b'\0'))
         return out
     msgs = [lines(t(i)) for i in (0x26, 0x27, 0x28, 0x29, 0x2A)] + [b'', lines(t(0x2C)), lines(t(0x6C))]
+    msgs += [wrap144(t(i)) for i in range(0x51, 0x59)]            # (the fat chocobo's: $51-$58)
     v = t(0x2B)
     a, _, b = v.partition('{04}')
     src = strtab('SP_MSG', msgs)
@@ -101,8 +112,10 @@ def ui_data(rom):
     src += strtab('SP_TITLE', names)
     yn = [re.sub(r'\{[^}]*\}', '', x).strip() for x in t(0x06).split('\n')]
     sets = [choices(t(0x0B)), choices(t(0x2D).split('\n')[1]), choices(t(0x2E).split('\n')[1]),
-            [(0, yn[0]), (0, yn[1])]]
-    src += strtab('SP_SETS', [bytes([len(c)]) + b'\0'.join(text.encode(w) for _, w in c) for c in sets])
+            [(0, yn[0]), (0, yn[1])], choices(t(0x24).replace('\n', ''))]
+    cols = [(3, 8, 13), (3, 8, 13), (3, 8, 13), (3, 8, 13), (3, 9, 16)]    # (the hand's 2 cells before)
+    src += strtab('SP_SETS', [bytes([len(c)]) + bytes(cols[k]) + b'\0'.join(text.encode(w) for _, w in c)
+                              for k, c in enumerate(sets)])
     # the inn's speech ($0104): re-wrapped to 144 pixels, its cost (6 digits wide) in one line
     sp = ui.clean(t(0x04).replace('[77][79]', 'HP').replace('{04}', '#'))
     lines, cur = [], []

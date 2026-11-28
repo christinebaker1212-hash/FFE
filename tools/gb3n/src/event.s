@@ -155,9 +155,9 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
 
 ; fix:E9E8: an inn ($E0-$E2), a shop ($E3-$FB) or the fat chocobo ($FC-), in bank CODE1
 ; (shop.s); after an inn its event (FF3 $7B01 -> $6C)
-shop_npc:   ld hl, choc_open                ; ($FC-: the fat chocobo, 3D/B383)
+shop_npc:   ld hl, choc13                   ; ($FC-: the fat chocobo, 3D/B383; shp.s)
             cp $FC
-            jr nc, .f
+            jr nc, .f13
             ld hl, shp_open                 ; (shops: rebuilt, shp.s in CODE13)
             cp $E3
             jr nc, .f13
