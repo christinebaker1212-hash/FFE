@@ -81,8 +81,16 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             ld [S49], a
             jr .l
 .old:       ld b, 0
-.old1:      ld a, [mn_cur]                  ; the screens not rebuilt yet: the earlier engine's
-            call mn_oldsub
+.old1:      ld a, [mn_cur]
+            cp 2                            ; Equip: rebuilt (eqm.s)
+            jr nz, .old2
+            push bc
+            call u_fadeout
+            pop bc
+            ld a, b
+            call eqm_open
+            jp .re
+.old2:      call mn_oldsub                  ; the screens not rebuilt yet: the earlier engine's
             jp .re
 .cfg:       call u_fadeout
             ld a, CODE1

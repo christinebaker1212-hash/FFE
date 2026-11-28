@@ -45,15 +45,22 @@ def width(s):
     w = 0
     for c in s:
         if c == 0xFF: w += 3
-        elif 0x60 <= c < 0x80: w = (w + 7) // 8 * 8 + 8
+        elif 0x50 <= c < 0x70: w = (w + 7) // 8 * 8 + 8
         elif FIRST <= c <= LAST: w += len(glyph_cols(text.DEC.get(c, ''))) + 1
     return w
+
+
+ARROW = 0xC9                    # (a code FF3's font leaves free: our arrow for the previews)
+ARROW_G = ["....", "#...", ".#..", "..#.", ".#..", "#...", "...."]
 
 
 def glyphs():
     out = bytearray()
     for c in range(FIRST, LAST + 1):
-        cols = glyph_cols(text.DEC.get(c, ''))
+        if c == ARROW:
+            cols = [[1 if y < 7 and ARROW_G[y][x] == '#' else 0 for y in range(8)] for x in range(3)]
+        else:
+            cols = glyph_cols(text.DEC.get(c, ''))
         assert len(cols) <= 8, (hex(c), len(cols))
         out.append(len(cols))
         for y in range(8):
@@ -121,7 +128,7 @@ def titles(rom, group_world):
 
 
 GB_WORDS = {'U_LV': 'LV', 'U_HP': 'HP', 'U_GIL': 'Gil', 'U_CAP': 'Capacity', 'U_CONFIG': 'Config',
-            'U_WORLD': 'World Map'}
+            'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove'}
 
 
 def code_data(rom, rgb555, group_world):
@@ -140,4 +147,11 @@ def code_data(rom, rgb555, group_world):
     src += strtab('U_TITLE', titles(rom, group_world))
     for k, v in GB_WORDS.items():
         src += db(k, text.encode(v) + b'\0')
+    w = menu.rom_words(rom)                             # (FF3's: the slots, Remove Equipment)
+    slots = [w['s_rh'], w['s_lh'], w['s_head'], w['s_body'], w['s_arms']]
+    src += strtab('U_SLOTN', [text.encode(x) for x in slots])
+    src += db('U_REM', text.encode(w['s_rem']) + b'\0')
+    src += db('U_ATK', text.encode(w['s_atk'].rstrip('…').strip()) + b'\0')
+    src += db('U_ARROW', bytes([ARROW, 0]))
+    src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
     return src

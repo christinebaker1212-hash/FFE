@@ -904,6 +904,291 @@ e_take:     call e_slotof
             scf
             ret
 
+
+; ---- for the rebuilt Equip screen (eqm.s, bank CODE11; reached by far_call): m_i = the member,
+; e_row = the row (0 right hand, 1 left, 2 head, 3 body, 4 arms). Results in u_eatk / u_edef /
+; u_eres (ui.s).
+eqx_m:      ld a, [m_i]
+            rrca
+            rrca
+            ld [m_ch], a
+            ld [mg_caster], a
+            ret
+; Attack / Defense now -> u_eatk / u_edef
+eqx_vals:   call eqx_m
+            ld a, [m_i]
+            call eq_calc
+            call st_atk
+            ld a, e
+            ld [u_eatk], a
+            ld a, d
+            ld [u_eatk + 1], a
+            call st_def
+            ld a, e
+            ld [u_edef], a
+            ld a, d
+            ld [u_edef + 1], a
+            ret
+; the values with item e_item (0: none) in row e_row's slot (the slot put back after)
+eqx_prev:   call eqx_m
+            ld a, [e_row]
+            call e_slotof
+            ld b, a
+            ld a, [m_ch]
+            add a, b
+            ld l, a
+            ld h, high(GS + $200)
+            ld a, [hl]
+            push af
+            push hl
+            ld a, [e_item]
+            ld [hl], a
+            call eqx_vals
+            pop hl
+            pop af
+            ld [hl], a
+            ld a, [u_eatk]
+            ld [u_patk], a
+            ld a, [u_eatk + 1]
+            ld [u_patk + 1], a
+            ld a, [u_edef]
+            ld [u_pdef], a
+            ld a, [u_edef + 1]
+            ld [u_pdef + 1], a
+            jp eqx_vals
+; the row's item to the bag; u_eres $FF if the bag is full
+eqx_take:   call eqx_m
+            ld a, [e_row]
+            call e_take
+            sbc a, a
+            ld [u_eres], a
+            ret
+; the bag's items for row e_row that the member's job can wear (owner: the others not shown)
+; -> e_ids (bag indexes), e_cnt
+eqx_list:   call eqx_m
+            ld a, [e_row]
+            call e_slotof
+            ld [e_slot], a
+            ld hl, e_ids
+            ld bc, 0
+.f:         ld a, c
+            add a, low(GS + $C0)
+            ld e, a
+            ld d, high(GS + $C0)
+            ld a, [de]
+            and a
+            jr z, .n
+            push af
+            call e_fits
+            jr nc, .np
+            pop af
+            push hl
+            push bc
+            call can_equip
+            pop bc
+            pop hl
+            jr z, .n
+            ld [hl], c
+            inc hl
+            inc b
+            jr .n
+.np:        pop af
+.n:         inc c
+            ld a, c
+            cp 32
+            jr nz, .f
+            ld a, b
+            ld [e_cnt], a
+            ret
+; bag index e_inv into row e_row (what is there first to the bag); u_eres 0 done, 1 not with
+; the other hand's weapon (3C/9D4B), $FF the bag full
+eqx_put:    call eqx_m
+            ld a, [e_row]
+            call e_slotof
+            ld [e_slot], a
+            ld a, [e_inv]
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            ld [e_item], a
+            ld a, [e_slot]
+            cp 3
+            jr c, .tk
+            xor 6                           ; the other hand: the combination table
+            ld b, a
+            ld a, [m_ch]
+            add a, b
+            ld l, a
+            ld h, high(GS + $200)
+            ld a, [hl]
+            and a
+            jr z, .tk
+            call e_wtype
+            ld b, a
+            ld a, [e_item]
+            call e_wtype
+            add a, a
+            add a, a
+            or b
+            ld l, a
+            ld h, 0
+            ld de, e_list.comb
+            add hl, de
+            ld a, [hl]
+            and a
+            ld a, 1
+            jr nz, .r
+.tk:        ld a, [e_item]                  ; (the bag index can move when the old item goes in:
+            push af                         ;   found again after)
+            ld a, [e_row]
+            call e_take
+            pop bc
+            ld a, $FF
+            jr c, .r
+            ld c, 0
+.fi:        ld a, c
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            cp b
+            jr z, .got
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .fi
+            xor a
+            jr .r
+.got:       ld a, c
+            ld [e_inv], a
+            call e_list.put
+            xor a
+.r:         ld [u_eres], a
+            ret
+; Optimize: each slot the strongest the job can wear (item byte 2: attack / defense); the right
+; hand a weapon (not arrows), the left the bow's arrows, else a shield
+eqx_opt:    call eqx_m
+            ld a, 2                         ; head, body, arms
+.ar:        ld [e_row], a
+            call .best0
+            ld a, [e_row]
+            inc a
+            cp 5
+            jr nz, .ar
+            xor a                           ; the hands: both off first
+            ld [e_row], a
+            call e_take
+            ld a, 1
+            ld [e_row], a
+            call e_take
+            xor a
+            ld [e_row], a
+            ld a, $00                       ; right: weapons $01-$4E, $57 (not arrows, shields)
+            ld [eqx_lo], a
+            ld a, $4F
+            ld [eqx_hi], a
+            call .best
+            ld a, 1
+            ld [e_row], a
+            ld a, [m_ch]                    ; left: arrows for a bow, else a shield
+            add a, 3
+            ld l, a
+            ld h, high(GS + $200)
+            ld a, [hl]
+            cp $4A
+            jr c, .sh
+            cp $4F
+            jr nc, .sh
+            ld a, $4F
+            ld [eqx_lo], a
+            ld a, $57
+            ld [eqx_hi], a
+            jr .best
+.sh:        ld a, $58
+            ld [eqx_lo], a
+            ld a, $62
+            ld [eqx_hi], a
+            jr .best
+.best0:     xor a                           ; (armour: any fitting id)
+            ld [eqx_lo], a
+            ld a, $FF
+            ld [eqx_hi], a
+            ld a, [e_row]
+            call e_take
+; the strongest bag item for row e_row with an id in [eqx_lo, eqx_hi) the job can wear, put on
+.best:      ld a, [e_row]
+            call e_slotof
+            ld [e_slot], a
+            ld a, $FF
+            ld [e_inv], a
+            xor a
+            ld [e_tmp], a                   ; (the best value + 1)
+            ld c, 0
+.bl:        push bc
+            ld a, c
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            and a
+            jr z, .bn
+            ld b, a
+            ld a, [eqx_lo]                  ; (b < lo or b >= hi: skipped)
+            ld c, a
+            ld a, b
+            cp c
+            jr c, .bn
+            ld a, [eqx_hi]
+            ld c, a
+            ld a, b
+            cp c
+            jr nc, .bn
+            push af
+            call e_fits
+            jr nc, .bp
+            pop af
+            push af
+            call can_equip
+            jr z, .bp
+            pop af
+            ld l, a                         ; its byte 2 (GAME_BANK $6000 + 8 id + 2)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $6002
+            add hl, de
+            ld a, GAME_BANK
+            call rd_byte
+            inc a
+            ld b, a
+            ld a, [e_tmp]
+            cp b
+            jr nc, .bn
+            ld a, b
+            ld [e_tmp], a
+            pop bc
+            push bc
+            ld a, c
+            ld [e_inv], a
+            jr .bn
+.bp:        pop af
+.bn:        pop bc
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .bl
+            ld a, [e_inv]
+            cp $FF
+            ret z
+            add a, low(GS + $C0)            ; (its id, for the put)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            ld [e_item], a
+            jp e_list.put
+
 ; the screen
 e_draw:     call m_clear
             ld bc, $0000

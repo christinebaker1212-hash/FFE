@@ -16,6 +16,7 @@ U_NPOOL    = 184
 U_BUF      = $D000              ; WRAM 7: the pool's tiles
 U_LINE     = $DE00              ; WRAM 2: a line's 1-bit rows (8 a tile, 20 tiles)
 u_palt     = $DF00              ; WRAM 2: the fades' target palettes (BG 0-7, OBJ 0-7)
+u_nbuf     = $DF80              ; WRAM 2: an item's name (17)
 UP_WHITE   = 1
 UP_LABEL   = 2
 UP_YELLOW  = 3
@@ -575,7 +576,7 @@ u_text0:    ld [u_pen], a                   ; A = the pen's start in the first c
             jr z, .sp
             cp $80
             jr nc, .gl
-            cp $60
+            cp $50
             jr c, .ch                       ; (control codes: skipped)
             ld e, a                         ; an icon: its own cell
             ld a, [u_pen]
@@ -602,7 +603,7 @@ u_text0:    ld [u_pen], a                   ; A = the pen's start in the first c
             srl a
             ld [hl+], a                     ; the cell (relative)
             ld a, e
-            sub $60
+            sub $50                         ; (FF3's icons: codes $50-$6F)
             add a, U_ICON
             ld [hl], a
             ld hl, u_nic
@@ -648,7 +649,7 @@ u_meas:     ld e, 0
             jr z, .sp
             cp $80
             jr nc, .g
-            cp $60
+            cp $50
             jr c, .c
             ld a, e
             add a, 7
@@ -930,6 +931,42 @@ u_ntoa:     ld hl, u_num
             ld [hl+], a
             ret
 
+; item A's name (GAME_BANK $4400 + 16 id: icon + letters, a leading blank dropped) -> u_nbuf,
+; HL = it
+u_iname:    ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4400
+            add hl, de
+            ld de, u_nbuf
+            ld bc, 16
+            ld a, GAME_BANK
+            call rd_copy
+            xor a
+            ld [u_nbuf + 16], a
+            ld hl, u_nbuf
+.sk:        ld a, [hl]
+            cp $FF
+            ret nz
+            inc hl
+            jr .sk
+
+; the pool's dirty tiles only (the canvas as it is: a change inside cells already shown)
+u_flusht:   ld a, [u_dlo]
+            ld b, a
+            ld a, [u_dhi]
+            sub b
+            ret z
+            ld a, 1
+            ld [u_tonly], a
+            call u_flush
+            xor a
+            ld [u_tonly], a
+            ret
+
 ; ---- the canvas and the pool to VRAM: the pool's dirty tiles, 24 a V-Blank (WRAM 7 -> VRAM bank
 ; 1 by DMA), then the canvas (menu_vbl, m_dirty)
 u_flush:    ld a, [u_dlo]
@@ -982,7 +1019,10 @@ u_flush:    ld a, [u_dlo]
             add a, b
             ld [u_dlo], a
             jr u_flush
-.map:       ld a, 1
+.map:       ld a, [u_tonly]
+            and a
+            ret nz
+            ld a, 1
             ld [m_dirty], a
             call wait_vbl
             call wait_vbl
@@ -1114,3 +1154,11 @@ u_nic:      ds 1
 u_ics:      ds 8
 u_num:      ds 6
 u_svb:      ds 1
+u_tonly:    ds 1
+u_eatk:     ds 2                            ; (the Equip screen: equip.s eqx_*)
+u_edef:     ds 2
+u_patk:     ds 2
+u_pdef:     ds 2
+u_eres:     ds 1
+eqx_lo:     ds 1
+eqx_hi:     ds 1
