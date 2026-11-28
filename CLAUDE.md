@@ -136,6 +136,11 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 - **The goal (owner, 2026-11-28):** a faithful but updated Final Fantasy III, as an official Nintendo
   release might be: FF3's game as on the NES (the translated routines) with the FF1 native build's
   updated mechanics and polish built on top.
+- **Native port (owner, 2026-11-28: "Native port, dammit!"):** hand translation only (no build-time
+  translator), and **no NES emulation layer of any kind**: no PPU / APU register shims. FF3's game
+  logic is translated from the listing; every routine that touches the PPU / APU / mapper becomes a
+  native Game Boy routine that works straight from FF3's RAM data (its buffers, positions, palettes)
+  and writes GB VRAM / OAM / palettes / sound registers itself.
 - Plan, RAM map, conventions and progress: `docs/ff3-gb-rewrite.md`.
 
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)

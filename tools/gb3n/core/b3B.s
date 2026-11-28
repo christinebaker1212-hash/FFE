@@ -1,13 +1,15 @@
 ; FF3 bank $3B translated routine by routine (docs/ff3-gb-rewrite.md); GB bank GB_3B.
 
 section bank GB_3B, $4000
-; ---- 3B/BE00 update map background tilemap: the row (moving vertically) or column (horizontally)
-; in $0780-$07BF to the nametables at FF3's metatile position ($30 row 0-14, $31 column 0-31; the
-; second 16 columns in the right-hand nametable); $80 / $81 / $82 as FF3 leaves them
+; ---- 3B/BE00 update map background tilemap (native): FF3's buffered row (moving vertically: 16
+; metatiles from column $31, $0780 / $0790 the upper tiles, $07A0 / $07B0 the lower) or column
+; (horizontally: 15 metatiles from row $30, $0780 / $07A0 the left tiles, $0790 / $07B0 the right) into
+; the GB map at FF3's nametable position (metatile row $30 0-14, column $31 0-31), with their CGB
+; attributes from FF3's shadow. RAM ($80-$82) and the registers as FF3's routine leaves them.
 f3B_BE00:   ld a, [BZ + $30]
             ld e, a
-            ld hl, $BF61                    ; (3B/BF61 / BF71: the rows' nametable addresses)
-            call n_rdx
+            ld hl, $BF61                    ; (3B/BF61 / BF71: the rows' nametable addresses, for
+            call n_rdx                      ;   the RAM FF3 leaves in $80 / $81)
             ld [BZ + $80], a
             ld hl, $BF71
             call n_rdx
@@ -32,151 +34,97 @@ f3B_BE00:   ld a, [BZ + $30]
             ld [BZ + $81], a
 .d:         ld a, [BZ + $2D]
             and 2
-            jp nz, .horz
-            ld a, e                         ; vertical: $82 = 16 - X
+            jr nz, .horz
+            ld a, e                         ; vertical: $82 = 16 - X (as FF3)
             xor $0F
             inc a
             ld [BZ + $82], a
-            call ppu_2002
-            ld a, [BZ + $81]
-            call ppu_2006
-            ld a, [BZ + $80]
-            call ppu_2006
-            ld c, 0
-            ld hl, NR2 + $0780
-            call .pair                      ; $0780 / $0790 up to $82
-            ld a, c
-            cp $10
-            jr nc, .v2
-            ld a, [BZ + $81]
-            xor 4
-            call ppu_2006
-            ld a, [BZ + $80]
-            and $E0
-            call ppu_2006
-            ld hl, NR2 + $0780
-            call .pair16
-.v2:        ld a, [BZ + $80]
+            ld a, [BZ + $80]                ; ($80 + $20: FF3's second row address)
             add $20
             ld [BZ + $80], a
-            ld a, [BZ + $81]
-            call ppu_2006
-            ld a, [BZ + $80]
-            call ppu_2006
-            ld c, 0
+            ld a, [BZ + $30]                ; GB: rows 2 $30 / + 1, columns 2 ($31 + i) (i < 16)
+            add a
+            ld d, a
+            ld hl, NR2 + $0780
+            call .row
+            inc d
             ld hl, NR2 + $07A0
-            call .pair
-            ld a, c
-            cp $10
-            jr nc, .vx
-            ld a, [BZ + $81]
-            xor 4
-            call ppu_2006
-            ld a, [BZ + $80]
-            and $E0
-            call ppu_2006
-            ld hl, NR2 + $07A0
-            call .pair16
-.vx:        ld a, d                         ; (as the 6502 leaves it: A = the last byte, the carry
-            scf                             ;   from CPY #$10)
+            call .row
+            ld c, $10                       ; (Y, A, carry as FF3 leaves them)
+            ld a, [NR2 + $07BF]
+            scf
             ret
-; [HL + Y], [HL + $10 + Y] to $2007 while Y < $82 (.pair) / Y < 16 (.pair16)
-.pair:      ld a, [BZ + $82]
-            ld b, a
-            jr .p
-.pair16:    ld b, $10
-.p:         ld a, c
-            cp b
-            ret nc
-.pl:        push hl
+.row:       ld a, [BZ + $31]
+            add a
+            ld e, a
+            ld c, 0
+.rl:        push hl
             ld a, l
             add c
             ld l, a
             ld a, [hl]
-            call ppu_2007
+            ld b, a
             ld a, l
             add $10
             ld l, a
+            ld a, b
+            call gbv_cell
+            inc e
             ld a, [hl]
-            ld d, a
-            call ppu_2007
+            call gbv_cell
+            inc e
+            ld a, e                         ; (column mod 64: the two nametables)
+            and 63
+            ld e, a
             pop hl
             inc c
             ld a, c
-            cp b
-            jr c, .pl
+            cp $10
+            jr c, .rl
             ret
-.horz:      ld a, [BZ + $30]                ; horizontal: $82 = 15 - row, columns of 15 metatiles
+.horz:      ld a, [BZ + $30]                ; horizontal: $82 = 15 - row (as FF3)
             ld b, a
             ld a, $0F
             sub b
             ld [BZ + $82], a
-            call ppu_2002
-            ld a, [BZ + $81]
-            call ppu_2006
-            ld a, [BZ + $80]
-            call ppu_2006
-            ld a, 4                         ; (address step 32)
-            call ppu_2000
-            ld c, 0
-            ld hl, NR2 + $0780
+            ld a, [BZ + $31]                ; GB: columns 2 $31 / + 1, rows 2 ($30 + i) mod 30
+            add a
+            ld e, a
+            ld hl, NR2 + $0780              ; left tiles: $0780 (upper), $07A0 (lower)
             call .col
-            ld a, c
-            cp $0F
-            jr nc, .h2
-            ld a, [BZ + $81]
-            and $24
-            call ppu_2006
-            ld a, [BZ + $80]
-            and $1F
-            call ppu_2006
-            ld hl, NR2 + $0780
-            call .col15
-.h2:        ld c, 0
-            ld a, [BZ + $81]
-            call ppu_2006
-            ld a, [BZ + $80]
-            inc a
-            call ppu_2006
-            ld hl, NR2 + $0790
+            inc e
+            ld hl, NR2 + $0790              ; right: $0790, $07B0
             call .col
-            ld a, c
-            cp $0F
-            jr nc, .h3
-            ld a, [BZ + $81]
-            and $24
-            call ppu_2006
-            ld a, [BZ + $80]
-            inc a
-            and $1F
-            call ppu_2006
-            ld hl, NR2 + $0790
-            call .col15
-.h3:        ld a, $88
-            scf                             ; (the carry from CPY #$0F)
-            jp ppu_2000
-; [HL + Y], [HL + $20 + Y] to $2007 while Y < $82 (.col) / Y < 15 (.col15)
-.col:       ld a, [BZ + $82]
+            ld c, $0F
+            ld a, $88
+            scf
+            ret
+.col:       ld a, [BZ + $30]
             ld b, a
-            jr .c0
-.col15:     ld b, $0F
-.c0:        ld a, c
-            cp b
-            ret nc
-.cl:        push hl
+            ld c, 0
+.cl:        ld a, b
+            add a
+            ld d, a
+            push hl
             ld a, l
             add c
             ld l, a
             ld a, [hl]
-            call ppu_2007
+            call gbv_cell
+            inc d
             ld a, l
             add $20
             ld l, a
             ld a, [hl]
-            call ppu_2007
+            call gbv_cell
             pop hl
-            inc c
+            inc b
+            ld a, b
+            cp $0F
+            jr c, .cn
+            ld b, 0
+.cn:        inc c
             ld a, c
-            cp b
+            cp $0F
             jr c, .cl
             ret

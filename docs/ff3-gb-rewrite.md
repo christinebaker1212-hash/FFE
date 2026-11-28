@@ -15,6 +15,10 @@ FF3's own routines is the faithful base (its rules, maps, events, timing and flo
 and polish are built on top of it, adapted to FF3 (where FF3 already has a mechanic, keep the better
 one, as decided 2026-11-26).
 
+**Native port (owner, 2026-11-28): hand translation only, and no NES emulation layer of any kind.**
+FF3's logic is translated; every routine that touches the NES hardware becomes a native Game Boy
+routine working from FF3's RAM data (no `$2006 / $2007` register shim: the earlier `core/ppu.s` is gone).
+
 ## Rules
 1. **One routine of ours per FF3 routine**, named by its address: `f3F_E1DC` (bank $3F, $E1DC), local
    labels inside. Same call graph: FF3's JSR / JMP targets are ours. A routine may be split or merged
@@ -66,20 +70,16 @@ WRAM banks 2-7 (BG map / tile shadows, decompressed maps, our extras).
 - **Pointers stay NES addresses** (so RAM is byte-for-byte FF3's). `(zp),Y` and absolute reads of ROM go
   through `n_rd` (bank 0): NES address -> RAM map (above) or the NES bank mapped at that window ->
   the GB bank / address, read, our code bank back.
-- **PPU**: FF3's own logic around the PPU (its row / column / attribute buffers at $0300 / $0780-$07FF,
-  window buffers, palette copies, the OAM page $0200) is translated as is, RAM for RAM. Only the
-  instructions that touch the PPU (`STA $2006 / $2007`, `$2000 / $2001 / $2005`, `$4014`) become calls
-  into the GB port (`core/ppu.s`): `ppu_ad` (the address), `ppu_wr` (a byte: pattern tables -> GB tiles
-  byte by byte, NES plane rows to GB interleaved; nametables -> the 32 x 32 GB BG map, NES row r -> GB row r,
-  column c of the two horizontal nametables -> c mod 32; attribute bytes -> CGB attributes (VRAM bank 1)
-  of their 4 x 4 cells; $3F00 -> the CGB palette shadow), the scroll / control writes -> SCX / SCY / LCDC
-  shadows set in V-Blank, $4014 -> the OAM page converted (x / y - the camera) and DMA'd. The NES's
-  30-row nametable wraps at 240 px, the GB map at 256: where the picture crosses NES row 30 an LYC split
-  adds 16 to SCY for the rest of the frame. The GB view is a 160 x 144 window of FF3's 256 x 240 picture
-  (the camera: the field 40 / 48 px in, so the party is centred; menus and windows: their FF3 tables
-  re-laid for 20 x 18). The GB view lies inside the NES view with 48 px to spare at each side, so
-  FF3's rows / columns drawn at its edges are never seen half-drawn, and the 64 -> 32 column fold
-  only ever overwrites columns out of view.
+- **Picture (native)**: FF3's logic around the picture (its row / column / attribute buffers at $0300 /
+  $0780-$07FF, window buffers, palette copies, the OAM page $0200) is translated as is, RAM for RAM. The
+  routines that would write the PPU are native GB routines (`core/gbv.s` helpers): they take FF3's
+  data and positions and write the GB BG map / CGB attributes (VRAM bank 1) / tiles / palettes / OAM
+  directly. Positions: FF3's nametable cell (row r of its 30, column c of its two side-by-side 32-column
+  nametables) is GB BG map cell (r, c mod 32); the 30-row picture wraps at 240 px, the GB map at 256,
+  so where the view crosses row 30 an LYC split moves SCY on by 16. The GB view is a 160 x 144 camera
+  inside FF3's 256 x 240 picture (field: 40 / 48 px in, the party centred; windows and menus re-laid
+  for 20 x 18 in FF3's own window tables), 48 px from each edge, so FF3's rows / columns drawn at its
+  edges are never seen half-drawn and the 64 -> 32 column fold only overwrites columns out of view.
 - **APU**: the kept sound driver (`sound.s`, FF3's $7F40 page moved to $DF40).
 - **Interrupts**: FF3's NMI work (OAM DMA, palette copy, scroll, the sound) and its waits (3F/FF36
   "wait for vblank" etc.) map onto our V-Blank handler; the frame structure stays FF3's.

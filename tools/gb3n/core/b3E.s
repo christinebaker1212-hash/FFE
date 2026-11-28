@@ -344,30 +344,56 @@ f3E_CAB1:   ld a, [BZ + $31]
             scf                             ; (the carry from the first part's CPY)
             ret
 
-; ---- 3E/CB61 update dialogue window attributes: the 16 (vertical) / 15 (horizontal) attribute bytes
-; in $07F0 to their nametable addresses ($07D0 / $07E0), last first
+; ---- 3E/CB61 update dialogue window attributes (native): the 16 (vertical) / 15 (horizontal)
+; attribute bytes FF3 merged into its shadow (CAB1: addresses $07D0 / $07E0, bytes $07F0) give the CGB
+; attributes of their 4 x 4 cells (from the shadow, as gbv_attr reads it); X ends $FF as FF3's loop
 f3E_CB61:   ld a, [BZ + $2D]
             ld e, $0F
             and 2
-            jr z, .v
+            jr z, .l
             ld e, $0E
-.v:         call ppu_2002
-.l:         ld a, e
-            add low(NR2 + $07D0)
+.l:         push de
+            ld a, e
+            add low(NR2 + $07E0)
             ld l, a
-            ld h, high(NR2 + $07D0)
-            ld a, [hl]
-            call ppu_2006
+            ld h, high(NR2 + $07E0)
+            ld a, [hl]                      ; $C0 + 8 row / 4 + column / 4 (FF3's attribute address)
+            and $3F
+            ld c, a
             ld a, l
-            add $10
+            sub $10
             ld l, a
-            ld a, [hl]
-            call ppu_2006
-            ld a, l
-            add $10
-            ld l, a
-            ld a, [hl]
-            call ppu_2007
+            ld a, [hl]                      ; $23 / $27: the nametable
+            and 4
+            add a
+            add a
+            add a                           ; (4 -> 32: the second nametable's columns)
+            ld b, a
+            ld a, c
+            and 7
+            add a
+            add a
+            add b
+            ld e, a                         ; E = first column (0-63)
+            ld a, c
+            and $38
+            srl a
+            ld d, a                         ; D = first row
+            ld b, 4
+.r:         push de
+            ld c, 4
+.c:         ld a, d
+            cp 30
+            jr nc, .sk
+            call gbv_attr
+.sk:        inc e
+            dec c
+            jr nz, .c
+            pop de
+            inc d
+            dec b
+            jr nz, .r
+            pop de
             dec e
             bit 7, e
             jr z, .l

@@ -195,8 +195,6 @@ t_loop:     ld hl, T_MBOX
             ldh [nb8], a
             ld a, [T_MBOX + 12]
             ldh [nbA], a
-            ld a, [T_MBOX + 13]             ; FF3's PPU control ($2000)
-            ldh [p_ctrl], a
             ld a, [T_MBOX + 3]              ; Y
             ld c, a
             ld a, [T_MBOX + 2]              ; X
