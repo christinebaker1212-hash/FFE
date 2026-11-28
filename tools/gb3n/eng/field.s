@@ -227,6 +227,9 @@ main:       call wait_vbl
 .spr:       ld a, [z76]                     ; a dialogue (FF3 $76 -> show dialogue)
             and a
             call nz, dlg_show
+            ld a, [z4B]                     ; the map's title (3F/E24C: table $82, a key closes)
+            cp $FF
+            call nz, dlg_title
             call q_feed
             call set_scroll
             call make_oam
@@ -655,7 +658,14 @@ load_map:   ld [aa_mode], a
             inc h
 .er:        ld a, [hl]
             ld [zF8], a
-            ld a, [mrec + 16 + 1]           ; (3A/930B: chests 16-31 hold gil)
+            ld a, $FF                       ; the map's title (3A/9341: property byte 2), from the
+            ld [z4B], a                     ;   world map only (3F/E8C6)
+            ld a, [aa_mode]
+            and a
+            jr nz, .nt
+            ld a, [mrec + 16 + 2]
+            ld [z4B], a
+.nt:        ld a, [mrec + 16 + 1]           ; (3A/930B: chests 16-31 hold gil)
             and $20
             ld [z49], a
             ld a, [mrec + 16 + 3]           ; the fill tile outside the 32 x 32 (byte 3)
@@ -1002,7 +1012,22 @@ win_pal7:   ld a, COMMON
 ; ---- FF3 check player input (3F/E2F8): an event's command, else A (talk / look), then a direction
 ; (from the pad, or set by the event) -> facing, passability, the step
 check_input:
-            ld a, [z6C]
+            ld a, [z50]                     ; (3F/E2F8: $80 the prologue, $81 the epilogue: the
+            and a                           ;   kept cutscenes, then the map again)
+            jr z, .n50
+            ld b, a
+            xor a
+            ld [z50], a
+            ld a, b
+            ld hl, cut_pro
+            cp $80
+            jr z, .cut
+            ld hl, cut_epi
+            cp $81
+            ret nz
+.cut:       ld b, B_CUT
+            jp full_run
+.n50:       ld a, [z6C]
             and a
             jr nz, .ev
             ld a, [z24]                     ; A: npcs and treasures (3F/EA26)

@@ -273,7 +273,7 @@ def main():
     if st == ['new']:                                # a new game: map 0, FF3's program start
         st = ['0', '0', '0', '0']; aa = 0
     elif st[0] == 'w':                               # (test builds: the world map, WORLD,X,Y)
-        st = ['$FF'] + st[1:]; aa = 0
+        st = ['$FF'] + st[1:]; aa = 0x81
     else:
         aa = 0x81
     src = ('START_MAP = %s\nSTART_WORLD = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +

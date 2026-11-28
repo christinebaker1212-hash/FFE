@@ -23,8 +23,27 @@ F_SP       = $20            ; (the blank: our font's space, the window colour)
 
 section bank 0, $1A00
 
+; the map's title (3F/E24C: FF3's window type 4, a line; any key closes it): t8200 + z4B
+dlg_title:  ld [z76], a
+            ld a, $FF
+            ld [z4B], a
+            ld a, $82
+            ld [z95], a
+            ld a, 1
+            ld [dlg_one], a
+            call dlg_show
+            xor a
+            ld [dlg_one], a
+            ret
+
 ; FF3 show dialogue: z76 = id in table z95 ($80 / $82 / $84 / $86); z7D: the last page waits for A
-dlg_show:   ld a, [z95]                     ; the table's index (port.py: TXT_IDX + 3 x id)
+dlg_show:   ld a, [dlg_one]                 ; (the box's height: 3 rows for a title, else 8)
+            and a
+            ld a, BOX_LINES - 1
+            jr z, .h
+            ld a, 23
+.h:         ldh [rLYC], a
+            ld a, [z95]                     ; the table's index (port.py: TXT_IDX + 3 x id)
             sub $80
             srl a                           ; 0-3
             ld e, a
@@ -73,6 +92,8 @@ dlg_show:   ld a, [z95]                     ; the table's index (port.py: TXT_ID
 .cl:        xor a
             ld [box_on], a
             call wait_vbl
+            ld a, BOX_LINES - 1
+            ldh [rLYC], a
             jp joy_clear
 
 ; nm_v (24 bits) / 10 -> nm_v, A = the remainder
@@ -136,6 +157,22 @@ dlg_page:   ld hl, win_buf
             ld d, F_UR
             call .row3
             ld e, 6
+            ld a, [dlg_one]                 ; (a title: one line, the frame under it)
+            and a
+            jr z, .mid
+            ld bc, (F_L << 8) | F_SP
+            ld d, F_R
+            call .row3
+            ld bc, (F_DL << 8) | F_B
+            ld d, F_DR
+            call .row3
+            ld e, 5
+.blk:       ld bc, (F_SP << 8) | F_SP
+            ld d, F_SP
+            call .row3
+            dec e
+            jr nz, .blk
+            jr .txt
 .mid:       ld bc, (F_L << 8) | F_SP
             ld d, F_R
             call .row3
@@ -144,7 +181,7 @@ dlg_page:   ld hl, win_buf
             ld bc, (F_DL << 8) | F_B
             ld d, F_DR
             call .row3
-            ld a, [dlg_bank]
+.txt:       ld a, [dlg_bank]
             call sbank
             ld a, [dlg_ptr]
             ld e, a
@@ -495,5 +532,6 @@ tw_acc:     ds 1
 tw_qh:      ds 1
 tw_ql:      ds 1
 tw_qt:      ds 1
+dlg_one:    ds 1                            ; 1: a one-line box (a map's title)
 nm_v:       ds 3
 nm_buf:     ds 9

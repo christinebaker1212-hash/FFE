@@ -184,7 +184,7 @@ ev_dbit:    ld b, a
 ev_tab:     dw ev_nop, ev_nop, ev_nop, ev_nop               ; $D0-$D3 shake, flash, darken, restore
             dw ev_d4, ev_d5, ev_d6, ev_d7                   ; $D4-$D7
             dw ev_nop, ev_nop, ev_nop, ev_db                ; $D8-$DB reset, ship, dance, prologue
-            dw ev_dc, ev_nop, ev_nop, ev_df                 ; $DC-$DF
+            dw ev_dc, ev_dd, ev_nop, ev_df                  ; $DC-$DF
             dw ev_e0, ev_e0, ev_nop, ev_nop                 ; $E0-$E3
             dw ev_nop, ev_nop, ev_nop, ev_e7                ; $E4-$E7
             dw ev_e8, ev_e9, ev_ea, ev_eb                   ; $E8-$EB
@@ -263,6 +263,12 @@ ev_db:      ld a, $80
 ev_dc:      ld a, $81
             ld [z50], a
             ret
+
+; $DD: the ending (3B/B5E4: 1F/BFFD; the kept cutscene)
+ev_dd:      call ev_ff
+            ld hl, cut_end
+            ld b, B_CUT
+            jp full_run
 
 ; $DF: every character with 0 HP to 1 (3B/B5FC)
 ev_df:      ld hl, SV + $10C
