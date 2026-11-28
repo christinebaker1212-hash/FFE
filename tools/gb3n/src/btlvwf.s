@@ -79,25 +79,24 @@ bv_init:    ldh a, [rSVBK]
             ld a, 1
             ld [bv_on], a
             ld [m_dirty], a
-; the palettes: BG 4-6 = BG 7's frame colours, their inks; the window's colour (Config) in 4-7
+; the palettes: BG 4-6 = BG 7 (FF3's window: frame, fill, white), 5 and 6 with the yellow and label
+; inks; the window's colour (Config) in 4-7; then the gradient (Config) over the short window
 bv_pals:    ld hl, pal_sh + 56
             ld de, pal_sh + 32
             ld c, 3
 .p:         push hl
-            ld b, 6
+            ld b, 8
 .c:         ld a, [hl+]
             ld [de], a
             inc de
             dec b
             jr nz, .c
             pop hl
-            inc de
-            inc de
             dec c
             jr nz, .p
-            ld hl, BV_INK                   ; colour 3 of BG 4-6
-            ld de, pal_sh + 38
-            ld c, 3
+            ld hl, BV_INK                   ; colour 3 of BG 5, 6
+            ld de, pal_sh + 46
+            ld c, 2
 .i:         ld a, [hl+]
             ld [de], a
             inc de
@@ -139,7 +138,11 @@ bv_pals:    ld hl, pal_sh + 56
             jr nz, .w
             ld a, 1
             ldh [pal_dirty], a
-            ret
+            ld bc, $060C
+; the gradient for the window from row C (screen), B rows (ui.s u_grbt; Config's Gradient)
+bv_grad:    ld a, CODE11
+            ld hl, u_grbt
+            jp far_call
 ; every row drawn again (WRAM 4 selected)
 bv_frc:     ld hl, BV_FRC
             ld b, 10
@@ -1303,7 +1306,7 @@ bv_vbl9:    ld a, [bv_busy]
             ldh [rSVBK], a
             ret
 
-; ---- the battle's end: the canvas copied as it is again
-bv_off:     xor a
-            ld [bv_on], a
-            ret
+; ---- the battle's end: the gradient off
+bv_off:     ld a, CODE11
+            ld hl, u_groff
+            jp far_call

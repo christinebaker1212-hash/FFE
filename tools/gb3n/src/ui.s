@@ -1220,6 +1220,23 @@ u_grramp:   ld hl, GR_BASE
             dec a
             jr nz, .l
             ret
+; the battle's windows (btlvwf.s): C = their top row on the screen, B = their height
+u_grbt:     call u_sv2
+            ld hl, GR_WIN
+            ld [hl], c
+            inc hl
+            ld [hl], b
+            ld a, 1
+            ld [GR_NW], a
+            call u_svr
+            call u_wcol
+            ld a, 4
+            ld [u_k], a
+            call u_sv2
+            call u_grramp
+            call u_svr
+            call u_grbuild
+            ; (fall through)
 ; the gradient on when Config has it (the UI showing), else off
 u_gron:     ld a, [opt_grad]
             and a

@@ -807,7 +807,28 @@ gr_vbl:     ldh a, [rSVBK]
             ld b, a
             ld d, [hl]
             call gr_put
-            ld a, [GR_REC]                  ; LYC: the first record's line - 1
+            ld a, [bv_on]                   ; (a battle: palettes 1-3 are the battlefield's, their
+            and a                           ;   colour 2 back from the shadow; the window covers the
+            jr z, .nb                       ;   lines where the gradient writes them)
+            ld hl, pal_sh + 12
+            ld c, low(rBCPS)
+            ld a, $8C
+.bp:        ld [c], a
+            inc c
+            ld e, a
+            ld a, [hl+]
+            ld [c], a
+            ld a, [hl+]
+            ld [c], a
+            dec c
+            ld a, l
+            add a, 6
+            ld l, a
+            ld a, e
+            add a, 8
+            cp $A4
+            jr nz, .bp
+.nb:        ld a, [GR_REC]                  ; LYC: the first record's line - 1
             dec a
             ldh [rLYC], a
             ld a, 2                         ; (the STAT interrupt: LYC)

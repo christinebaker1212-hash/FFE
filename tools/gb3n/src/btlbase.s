@@ -45,9 +45,9 @@ ARROW      = $CA
 ; the battle windows' strings (btlvwf.s bv_put): flags
 BVF_R      = $08                ; flags: right-aligned
 BVF_C      = $10                ;   centred
-BVP_W      = 7                  ; palettes: white, yellow, label, green
-BVP_Y      = 4
-BVP_L      = 5
+BVP_W      = 4                  ; palettes: white (and the frames), yellow, label (4-6: the menus'
+BVP_Y      = 5                  ;   gradient writes colour 2 of BG palettes 1-6)
+BVP_L      = 6
 BVP_G      = 6
 BD_CMDS    = BD_2F + $240       ; 34/9B21: 4 battle commands a job (build.py)
 HAND_T     = $60                ; the hand cursor (VRAM bank 1; loaded again after the spells, btlui.s)

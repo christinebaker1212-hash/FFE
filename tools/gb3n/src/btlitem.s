@@ -761,6 +761,8 @@ b_can:      ld l, a
 ; ---- the tall window (screen rows 8-17): the party's sprites hidden while it shows
 tall_open:  ld a, 64
             ldh [rWY], a
+            ld bc, $0A08                    ; (the gradient over the tall window)
+            call bv_grad
             ld hl, oam_buf
             ld b, 24
 .h:         ld [hl], 0
@@ -775,6 +777,8 @@ tall_close: ld b, $FF
             call b_hand
             ld a, 96
             ldh [rWY], a
+            ld bc, $060C
+            call bv_grad
             call hp_win                     ; (the windows below again: the list's lines gone)
             jp chr_draw
 

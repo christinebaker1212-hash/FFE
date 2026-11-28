@@ -61,7 +61,7 @@ act_script: ld a, [W7 + $7EC2]
 .end:       jp msg_done                     ; (battle graphics $25)
 
 sc_tab:     dw sc_close, sc_close, sc_close, sc_close3, sc_close, sc_atk, sc_act, sc_tgt
-            dw sc_stat, sc_msg, sc_wait, sc_anim, sc_num, sc_death, sc_none
+            dw sc_stat, sc_msg, sc_wait, sc_anim, sc_numw, sc_death, sc_none
 
 sc_none:    ret
 
@@ -454,6 +454,20 @@ b_waitA:    call b_keys
             ld a, [btl_new]
             bit 0, a
             jr z, b_waitA
+            ret
+
+; $0C, then the party's lines with the HP as they are now (the window under no message)
+sc_numw:    call sc_num
+            ld a, [msg_full]
+            and a
+            ret nz
+            xor a
+.m:         ld [btl_m], a
+            call hp_line
+            ld a, [btl_m]
+            inc a
+            cp 4
+            jr nz, .m
             ret
 
 ; $0B: the attack animation (34/8411: btlanim.s)

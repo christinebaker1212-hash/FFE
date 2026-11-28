@@ -376,9 +376,13 @@ wait_vbl:   ld a, [bv_on]                   ; (battle: the windows' changed rows
             push bc
             push de
             push hl
+            ld a, [rom_bank]                ; (the bank mapped now, not code_bank: a copy can be
+            push af                         ;   waiting with its source bank in the window)
             ld a, CODE3
             ld hl, bv_conv
             call far_call
+            pop af
+            ld [MBC5_BANKL], a
             pop hl
             pop de
             pop bc

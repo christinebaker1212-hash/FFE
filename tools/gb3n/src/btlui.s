@@ -28,7 +28,7 @@ ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
             xor a
             ld [msg_full], a
             ld [msg_keep], a
-            ld a, PAL_TXT | 8
+            ld a, BVP_W | 8
             ld [m_tattr], a
             ld a, 96
             ldh [rWY], a
