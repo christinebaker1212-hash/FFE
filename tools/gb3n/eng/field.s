@@ -1866,7 +1866,9 @@ dma_rom:    ld a, high(oam_buf)
             ret
 dma_end:
 
-; ---- not a Game Boy Color: FF3 is a Color-only Game Pak (Lot Check: a message on older systems)
+; ---- not a Game Boy Color: FF3 is a Color-only Game Pak (Lot Check: a notice on older systems; the
+; owner's screen, variant B, with Nintendo's hardware names). DMG registers only (no Color register is
+; written on a DMG / SGB).
 not_cgb:    ldh a, [rLCDC]
             bit 7, a
             jr z, .h
@@ -1875,8 +1877,51 @@ not_cgb:    ldh a, [rLCDC]
             jr c, .w
             xor a
             ldh [rLCDC], a
-.h:         halt
-            jr .h
+.h:         ld hl, $C000                    ; work RAM cleared (Lot Check; not the stack's page)
+            ld de, $0F00
+            call memclr
+            ld hl, $D000
+            ld de, $1000
+            call memclr
+            ld hl, $8000                    ; VRAM
+            ld de, $2000
+            call memclr
+            ld hl, $FE00                    ; OAM (LCD off)
+            ld de, $A0
+            call memclr
+            ld a, B_OWN                     ; our font and frame tiles
+            ld [MBC_BANK], a
+            ld hl, C_TILES
+            ld de, $8000
+            ld bc, $1000
+            call memcpy
+            ld hl, C_SCR_CGBONLY            ; the notice, 20 x 18
+            ld de, $9800
+            ld c, 18
+.r:         ld b, 20
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, e
+            add a, 12
+            ld e, a
+            jr nc, .n
+            inc d
+.n:         dec c
+            jr nz, .r
+            xor a
+            ldh [rNR52], a                  ; sound off
+            ld a, %00100111                 ; BGP: 0 black, 1 light grey, 2 dark grey, 3 white
+            ldh [rBGP], a
+            ld a, $91                       ; LCD on, BG tiles at $8000
+            ldh [rLCDC], a
+            xor a
+            ldh [rIE], a
+.idle:      halt
+            nop
+            jr .idle
 
 section wram, $C000
 oam_buf:    ds 160
