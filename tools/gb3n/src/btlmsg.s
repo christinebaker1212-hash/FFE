@@ -120,7 +120,17 @@ sc_close3:  ld a, [W7 + $78EE]
 sc_atk:     ld a, [W7 + $78D6]
             call name_of
             ret nc
-            xor a
+            ld a, [W7 + $78D6]              ; (a member: its name yellow in the party window)
+            bit 7, a
+            jr nz, .o
+            ld [btl_hl], a
+            ld [btl_m], a
+            ld a, [msg_full]
+            and a
+            call z, hp_line
+            ld a, [W7 + $78D6]
+            call name_of
+.o:         xor a
             jp msg_open
 
 ; the name of id A (a member, monster $80 + slot) -> btl_str; carry clear: none
@@ -209,10 +219,26 @@ sc_act:     ld a, [BZ + $72]
             ld b, 2
             call bstr
             jr .open
-.hits:      ld [btl_tmp2], a                ; n + $0633 ("hits")
+.hits:      ld [btl_tmp2], a                ; n + $0633 (" hits": "1 Hit", "n Hits", the label colour)
+            ld a, BVP_L
+            ld [msg_pal], a
             ld a, $33
             ld b, 2
             call bstr
+            ld a, [btl_str + 1]             ; (its first letter a capital: h -> H)
+            sub $A4 - $8A
+            ld [btl_str + 1], a
+            ld a, [btl_tmp2]
+            dec a
+            jr nz, .hs
+            ld hl, btl_str                  ; (one: the last letter off)
+.he:        ld a, [hl+]
+            and a
+            jr nz, .he
+            dec hl
+            dec hl
+            ld [hl], 0
+.hs:
             ld hl, btl_str + 29             ; the string moved right by 2
             ld de, btl_str + 31
             ld b, 30
@@ -260,7 +286,19 @@ sc_tgt:     ld a, [W7 + $78D8]
             jr .o
 .n:         call name_of
             ret nc
-.o:         ld a, 2
+.o:         ld hl, btl_str + 29             ; "> " before it
+            ld de, btl_str + 31
+            ld b, 30
+.mv:        ld a, [hl-]
+            ld [de], a
+            dec de
+            dec b
+            jr nz, .mv
+            ld a, ARROW
+            ld [btl_str], a
+            ld a, $FF
+            ld [btl_str + 1], a
+            ld a, 2
             jp msg_open
 
 ; $08: the status message (middle right): t8200 $010C + $0C + id
@@ -1092,360 +1130,213 @@ st_mon:     ld [BZ + $18], a
 
 ; ---- the message window
 msg_reset:  xor a
-            ld [msg_n], a
-            ld [msg_lines], a
-            ld [msg_rest], a
-            ld a, $FF
-            ld hl, msg_wl2
-            ld b, 5
-.c2:        ld [hl+], a
-            dec b
-            jr nz, .c2
-            ld hl, msg_wl
+            ld hl, msg_op
             ld b, 5
 .c:         ld [hl+], a
             dec b
             jr nz, .c
+            ld a, $FF
+            ld [btl_hl], a
+            ld a, BVP_W
+            ld [msg_pal], a
             ret
 
-; open window A (0-4) with btl_str
+; window A (0-4) shows btl_str: 0-3 the action's lines in the left window (0 the actor, yellow;
+; 1 the action; 2 "> target"; 3 the status), kept in WRAM 4 (btlvwf.s BV_NAR) so they come back
+; after a message; 4 a battle message over both windows, wrapped by its width
 msg_open:   ld [msg_w], a
-            ld a, [msg_n]
-            and a
-            call z, msg_frame
-            ld a, [msg_w]                   ; (opened again: the old cells first)
-            call msg_close
-            call msg_wrap
-            ld hl, btl_str                  ; the length (18 at most)
-            ld b, 0
-.l:         ld a, [hl+]
-            and a
-            jr z, .l1
-            inc b
-            ld a, b
-            cp 18
-            jr nz, .l
-.l1:        ld a, b
-            ld [msg_len], a
-            ld a, [msg_w]                   ; the target behind the attacker's name
-            cp 2
-            jr nz, .free
-            ld a, [msg_wl]
-            cp $FF
-            jr z, .free
-            ld [msg_tmp], a                 ; (its line)
-            ld a, [msg_alen]
-            ld c, a
-            ld a, [msg_len]
-            add a, c
-            inc a
-            cp 19
-            jr nc, .free
-            ld a, [msg_tmp]
-            ld [msg_wl + 2], a
-            ld a, c
-            ld [msg_wc + 2], a              ; (from the arrow's column)
-            ld b, c
-            jr .put
-.free:      ld a, [msg_lines]               ; the first free line, else the last
-            ld e, a
-            ld c, 0
-            ld b, 1
-.f:         ld a, e
-            and b
-            jr z, .got
-            sla b
-            inc c
-            ld a, c
             cp 4
-            jr nz, .f
-            ld c, 3
-            ld b, 8
-            ld a, 3                         ; (covered: whoever had it loses it)
-            call msg_owner
-.got:       ld a, [msg_lines]
-            or b
-            ld [msg_lines], a
-            ld a, c
-            ld [msg_tmp], a
-            ld a, [msg_w]
+            jp z, msg_full_on
             ld e, a
             ld d, 0
-            ld hl, msg_wl
+            ld hl, msg_op
             add hl, de
-            ld [hl], c
-            ld hl, msg_wc
+            ld [hl], 1
+            ld hl, msg_pl                   ; the palette: 0 yellow, 1 msg_pal, else white
             add hl, de
-            ld [hl], 0
+            ld a, [msg_w]
             and a
-            jr nz, .nb
-            ld a, [msg_len]                 ; (the attacker: its length kept)
-            ld [msg_alen], a
-.nb:        ld b, 0
-.put:       ld de, win_buf                  ; B = column: the arrow first (if not 0)
-            ld a, b
+            ld a, BVP_Y
+            jr z, .p
+            ld a, [msg_w]
+            dec a
+            ld a, BVP_W
+            jr nz, .p
+            ld a, [msg_pal]
+.p:         ld [hl], a
+            ld a, BVP_W
+            ld [msg_pal], a
+            ld a, [msg_w]
+            ld hl, btl_str
+            call bv_nsav
+            ld a, [msg_full]
             and a
-            jr z, .cp
-            ld a, ARROW
-            ld [de], a
-            inc de
-.cp:        ld hl, btl_str
-            ld a, [msg_len]
-            ld c, a
-            and a
-            jr z, .z
-.c:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec c
-            jr nz, .c
-.z:         xor a
-            ld [de], a
-            ld hl, msg_n
-            inc [hl]
-            ld a, [msg_tmp]                 ; row 1 + line, column 1 + B
+            ret nz
+            ld a, [msg_w]
+; window A's line from its copy
+msg_line:   ld [msg_w], a
+            ld e, a
+            ld d, 0
+            ld hl, msg_pl
+            add hl, de
+            ld a, [hl]
+            ld e, a
+            ld a, [msg_w]
             inc a
             ld c, a
-            inc b
-            call msg_text
-            ld a, [msg_rest]                ; the rest of a wrapped text: a line of its own
-            and a
-            ret z
-            ld hl, msg_rest
-            ld de, btl_str
-            ld bc, 20
-            call memcpy
-            xor a
-            ld [msg_rest], a
-            call msg_free
+            ld b, 1
+            ld d, 10
             ld a, [msg_w]
-            ld e, a
-            ld d, 0
-            ld hl, msg_wl2
-            add hl, de
-            ld [hl], c
-            push bc
-            ld hl, btl_str
-            ld de, win_buf
-            ld b, 18
-.r:         ld a, [hl+]
-            ld [de], a
-            inc de
-            and a
-            jr z, .r1
-            dec b
-            jr nz, .r
-            xor a
-            ld [de], a
-.r1:        pop bc
-            inc c
-            ld b, 1
-            jp msg_text
+            jp bv_nput
 
-; a text longer than 18: cut at its last space within 19 cells, the rest -> msg_rest
-msg_wrap:   xor a
-            ld [msg_rest], a
-            ld hl, btl_str
-            ld b, 0
-.l:         ld a, [hl+]
+; the message window over both (once), its lines
+msg_full_on: ld a, [msg_full]
             and a
-            ret z
-            inc b
-            ld a, b
-            cp 19
-            jr c, .l
-            ld hl, btl_str + 18             ; the last space at or before cell 18
-            ld b, 18
-.s:         ld a, [hl]
-            cp $FF
-            jr z, .cut
-            dec hl
-            dec b
-            jr nz, .s
-            ld hl, btl_str + 18             ; (none: cut at 18)
-            ld a, [hl]
-            push hl
-            ld de, msg_rest
-            jr .cp
-.cut:       push hl
-            inc hl
-            ld de, msg_rest
-.cp:        ld c, 19
-.c:         ld a, [hl+]
-            ld [de], a
-            inc de
-            and a
-            jr z, .e
-            dec c
-            jr nz, .c
-            xor a
-            ld [de], a
-.e:         pop hl
-            ld [hl], 0
-            ret
-
-; the first free line -> C (its bit set), else the last (its owners lose it)
-msg_free:   ld a, [msg_lines]
-            ld e, a
-            ld c, 0
-            ld b, 1
-.f:         ld a, e
-            and b
-            jr z, .got
-            sla b
-            inc c
-            ld a, c
-            cp 4
             jr nz, .f
-            ld c, 3
-            ld b, 8
-            ld a, 3
-            push bc
-            call msg_owner
-            pop bc
-.got:       ld a, [msg_lines]
-            or b
-            ld [msg_lines], a
-            ret
-
-; whoever owns line A (whole line) loses it
-msg_owner:  ld hl, msg_wl
-            ld e, 5
-.l:         cp [hl]
-            jr nz, .n
-            ld [hl], $FF
-.n:         inc hl
-            dec e
-            jr nz, .l
-            ret
-
-; close window A: its cells blanked; the last one: the party window back
-msg_close:  push af
-            call msg_blank
-            pop af
-            ld e, a
-            ld d, 0
-            ld hl, msg_wl
-            add hl, de
-            ld a, [hl]
-            cp $FF
-            ret z
-            ld [hl], $FF
-            ld hl, msg_n
-            dec [hl]
-            ret
-
-; the cells of window A blanked (its line freed if it starts the line; its second line too)
-msg_blank:  push af
-            ld e, a
-            ld d, 0
-            ld hl, msg_wl2
-            add hl, de
-            ld a, [hl]
-            cp $FF
-            jr z, .one
-            ld [hl], $FF
-            ld c, a
-            call msg_unline
-            ld b, 0
-            call msg_clr
-.one:       pop af
-            ld e, a
-            ld d, 0
-            ld hl, msg_wl
-            add hl, de
-            ld a, [hl]
-            cp $FF
-            ret z
-            ld c, a
-            ld hl, msg_wl + 5
-            add hl, de
-            ld b, [hl]
-            ld a, b
-            and a
-            jr nz, .k
-            call msg_unline                 ; (the whole line: freed)
-.k:         ; (fall through)
-; line C blanked from column B
-msg_clr:    ld hl, win_buf                  ; blanks from column B to 17
-            ld a, 18
-            sub b
-            ld d, a
-.b:         ld [hl], $FF
-            inc hl
-            dec d
-            jr nz, .b
-            ld [hl], 0
-            inc c
-            inc b
-            jp msg_text
-
-; line C's bit freed
-msg_unline: push bc
-            ld a, c
-            inc a
-            ld d, a
-            ld a, $80
-.s:         rlca
-            dec d
-            jr nz, .s
-            cpl
-            ld d, a
-            ld a, [msg_lines]
-            and d
-            ld [msg_lines], a
-            pop bc
-            ret
-
-; the window's frame and empty lines
-msg_frame:  call cv2
-            ld bc, $0000
+            ld a, 1
+            ld [msg_full], a
+.f:         ld bc, $0000
             ld de, $1406
-            call b_box
-            ld c, 1
-.r:         ld b, 1
-.k:         ld a, $FF
-            call m_put
-            inc b
-            ld a, b
-            cp 19
-            jr nz, .k
-            inc c
-            ld a, c
-            cp 5
-            jr nz, .r
-            xor a
-            ld [msg_lines], a
-            jr msg_text.dirty
-
-; win_buf (0-ended) at column B, row C of the canvas
-msg_text:   call cv2
-            ld hl, win_buf
-.l:         ld a, [hl+]
+            call w_box
+; btl_str in lines of 144 pixels at rows 1-4 (at spaces; a word longer than a line cut)
+msg_wput:   ld a, 1
+            ld [msg_row], a
+            ld hl, btl_str
+.line:      ld a, [hl]                      ; (blanks at a line's start skipped)
+            cp $FF
+            jr nz, .l0
+            inc hl
+            jr .line
+.l0:        and a
+            ret z
+            push hl                         ; (the line's start)
+            ld c, 0
+            ld de, 0                        ; (the last space: none)
+.ch:        ld a, [hl]
             and a
-            jr z, .dirty
-            call m_put
-            inc b
-            jr .l
-.dirty:     ld a, 1
-            ld [m_dirty], a
-            call cv3
-            jp wait_vbl
+            jr z, .last
+            cp $FF
+            jr nz, .g
+            ld d, h
+            ld e, l
+            ld a, c
+            add a, 3
+            ld c, a
+            inc hl
+            jr .ch
+.g:         push de
+            call bv_cw
+            pop de
+            add a, c
+            jr c, .brk
+            cp 145 + 1
+            jr nc, .brk
+            ld c, a
+            inc hl
+            jr .ch
+.brk:       ld a, d                         ; at the last space, else here
+            or e
+            jr z, .cut
+            ld h, d
+            ld l, e
+.cut:       pop bc
+            call msg_lput
+            ld a, [msg_row]
+            inc a
+            ld [msg_row], a
+            cp 5
+            ret z
+            jr .line
+.last:      pop bc
+            ; (fall through)
+; the text from BC up to HL -> row msg_row (HL kept)
+msg_lput:   push hl
+            ld de, win_buf + 80
+.c:         ld a, b
+            cp h
+            jr nz, .cp
+            ld a, c
+            cp l
+            jr z, .e
+.cp:        ld a, [bc]
+            ld [de], a
+            inc bc
+            inc de
+            ld a, e
+            cp low(win_buf + 80 + 31)
+            jr nz, .c
+.e:         xor a
+            ld [de], a
+            ld a, [msg_row]
+            ld c, a
+            ld b, 1
+            ld d, 19
+            ld e, BVP_W
+            ld hl, win_buf + 80
+            call bv_put
+            pop hl
+            ret
 
-; the end of the script: the windows gone, the party window back
+; close window A: its line gone; the message: the windows below back (not while kept)
+msg_close:  cp 4
+            jr z, .m
+            ld e, a
+            ld d, 0
+            ld hl, msg_op
+            add hl, de
+            ld [hl], 0
+            ld a, [msg_full]
+            and a
+            ret nz
+            ld a, e
+            inc a
+            ld c, a
+            ld b, 0
+            ld d, 10
+            jp bv_clr
+.m:         ld a, [msg_full]
+            and a
+            ret z
+            ld a, [msg_keep]
+            and a
+            ret nz
+; the windows back after a message: the party's, the action's open lines
+msg_back:   call hp_win
+            xor a
+.l:         ld [msg_w], a
+            ld e, a
+            ld d, 0
+            ld hl, msg_op
+            add hl, de
+            ld a, [hl]
+            and a
+            call nz, .one
+            ld a, [msg_w]
+            inc a
+            cp 4
+            jr nz, .l
+            ret
+.one:       ld a, [msg_w]
+            push af
+            call msg_line
+            pop af
+            ld [msg_w], a
+            ret
+
+; the end of the script: the lines gone, the windows back (a kept message stays)
 msg_done:   call msg_reset
+            ld a, [msg_keep]
+            and a
+            ret nz
             jp hp_win
 
 section wram, $DF40
-msg_wl:     ds 5                ; per window: line (FF: closed)
-msg_wc:     ds 5                ; and first column (0: the whole line)
-msg_n:      ds 1                ; windows open
-msg_lines:  ds 1                ; lines in use (bits 0-3)
+msg_op:     ds 5                ; per window 0-3: open
+msg_pl:     ds 4                ;   its palette
+msg_full:   ds 1                ; the message window over both
+msg_keep:   ds 1                ; (the battle's end: messages replace each other, no windows between)
 msg_w:      ds 1
-msg_len:    ds 1
-msg_tmp:    ds 1
-msg_alen:   ds 1
-msg_wl2:    ds 5                ; per window: a wrapped text's second line (FF: none)
-
-section wram, $DF00
-msg_rest:   ds 20               ; (WRAM bank 3, FF3's unused $7F00-: the flash's copy is gone)
+msg_pal:    ds 1                ; the next action line's palette (the hits: the label colour)
+msg_row:    ds 1
+btl_hl:     ds 1                ; the member shown yellow in the party window ($FF none)
+bn_f:       ds 1                ; (btlui.s bnum)

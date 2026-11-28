@@ -670,7 +670,12 @@ mg_targets: ld a, [W7 + $747D]
 .m1:        ld [BZ + $B3], a
             xor a
             ld [W7 + $7CE8], a
+            call tg_on                      ; (the target's name in the left window)
             call target_sel
+            push af
+            xor a
+            ld [btl_tw], a
+            pop af
             and a
             ld a, 2
             ret z
@@ -770,14 +775,13 @@ tall_close: ld b, $FF
             call b_hand
             ld a, 96
             ldh [rWY], a
+            call hp_win                     ; (the windows below again: the list's lines gone)
             jp chr_draw
 
 ; the list: the cursor's column (top four lines), the next one below, the hands (two)
-bit_draw:    call cv2
-            ld bc, $0000
+bit_draw:    ld bc, $0000
             ld de, $140A
-            call b_box
-            call cv3
+            call w_box
             ld a, [IT_X]
             ld [btl_k], a
             ld c, 1
@@ -793,7 +797,7 @@ bit_draw:    call cv2
             add a, a
             add a, a
             add a, a
-            add a, 64 + 8 - 4
+            add a, 64 + 8
             ld c, a
             ld b, 0
             call b_hand
@@ -842,9 +846,14 @@ it_col:     xor a
             ld a, [hl]
             ld [btl_tmp + 3], a
             call .blank
+            xor a
+            ld [it_nm], a
             ld a, [btl_tmp + 2]
             and a
             jr z, .pick
+            ld a, 1
+            ld [it_nm], a
+            ld [it_us], a
             ld a, [btl_k]                   ; the usability mark
             add a, a
             add a, a
@@ -856,39 +865,7 @@ it_col:     xor a
             ld hl, W7 + $7B3D
             add hl, de
             ld a, [hl]
-            and a
-            jr nz, .nm
-            ld a, $73
-            ld [win_buf], a
-.nm:        ld a, [btl_tmp + 2]             ; the name ($0400 + id, its icon first)
-            ld b, 0
-            call bstr
-            ld hl, btl_str
-            ld de, win_buf + 1
-            ld b, 14
-.n:         ld a, [hl+]
-            and a
-            jr z, .q
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .n
-.q:         ld a, $C8                       ; ":" and the count
-            ld [win_buf + 15], a
-            ld a, [btl_tmp + 3]
-            ld b, $80
-.d:         cp 10
-            jr c, .d1
-            sub 10
-            inc b
-            jr .d
-.d1:        add a, $80
-            ld [win_buf + 17], a
-            ld a, b
-            cp $80
-            jr nz, .d2
-            ld a, $FF
-.d2:        ld [win_buf + 16], a
+            ld [it_us], a                   ; (not usable: grey)
 .pick:      ld a, [IT_SEL]                  ; the picked place: an arrow before it
             and a
             jr z, .put
@@ -909,12 +886,55 @@ it_col:     xor a
             ld b, 1
             call cv_line
             pop bc
+            push bc
+            ld a, [it_nm]
+            and a
+            call nz, it_str
+            pop bc
             inc c
             ld a, [btl_n2]
             inc a
             cp 4
             jr nz, .r
             ret
+; the item's name (icon dropped) and ":count" on row C (small font strings; grey: not usable)
+it_str:     push bc
+            ld a, [btl_tmp + 2]
+            ld b, 0
+            call bstr
+            ld hl, btl_str + 1
+            ld de, btl_str
+            ld bc, 31
+            call memcpy
+            pop bc
+            push bc
+            ld a, [it_us]
+            and a
+            ld e, BVP_W
+            jr nz, .w
+            ld e, BVP_L
+.w:         ld a, e
+            ld [it_nm], a
+            ld b, 2
+            ld d, 16
+            ld hl, btl_str
+            call bv_put
+            ld hl, btl_str
+            ld [hl], $C8                    ; ":" and the count
+            inc hl
+            ld a, [btl_tmp + 3]
+            ld e, a
+            ld d, 0
+            call bnum
+            ld [hl], 0
+            pop bc
+            ld a, [it_nm]
+            or BVF_R
+            ld e, a
+            ld b, 16
+            ld d, 19
+            ld hl, btl_str
+            jp bv_put
 lbl_r:      db $9B, $BE, $91, $A4, $B1, $A7, 0      ; R.Hand
 lbl_l:      db $95, $BE, $91, $A4, $B1, $A7, 0      ; L.Hand
 
@@ -930,3 +950,7 @@ cv_line:    call cv2
 .d:         ld a, 1
             ld [m_dirty], a
             jp cv3
+
+section wram, $DF57                         ; (WRAM 3: after btlui.s's)
+it_nm:      ds 1                            ; the line is an item (then its palette)
+it_us:      ds 1                            ;   usable

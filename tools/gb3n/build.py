@@ -257,7 +257,7 @@ BDATA_BANK = 88                         # battle data (encounter tables, formati
 CODE2 = 89                              # battle code: the game logic
 CODE2_MODULES = ('btl', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlact', 'btlfight')
 CODE3 = 110                             # battle code: the presentation (graphics, windows, input)
-CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop', 'btlitem', 'btlmagm')
+CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop', 'btlitem', 'btlmagm', 'btlvwf')
 CODE4 = 111                             # battle code: magic, victory, the other actions
 BDATA3_BANK = 112                       # 2A/8000 boss tilemaps, 2F/9068 boss graphics pointers
 CODE4_MODULES = ('btlmagic', 'btlwin', 'btlact2')
@@ -378,6 +378,9 @@ def engine_src(rom=None):
         for c, (_, r) in zip(c1, ss):
             codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
             rams.append(r)
+        if bank == CODE3 and rom is not None:      # (btlvwf.s: the small font's glyphs, the inks)
+            import ui
+            codes.append(ui.bv_data(rgb555))
     codes.append('section bank %d, $4000' % CODE5)
     for m in ('cut', 'fx'):
         c, r = split(rd(m))

@@ -895,6 +895,7 @@ pal8:       ld b, 16
 ; FFA26's end: the fade (for now the screen off) and the field's WRAM bank
 btl_end:    call pal_black                  ; (the LCD stays on: the field loads behind black)
             xor a
+            ld [bv_on], a                   ; (btlvwf.s off)
             ld [menu_on], a                 ; (the battle's window off, as at boot)
             ldh [rWY], a
             ldh [scx], a

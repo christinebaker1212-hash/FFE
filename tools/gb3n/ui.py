@@ -76,6 +76,15 @@ PAL_ORDER = ('white', 'white', 'label', 'yellow', 'green', 'grey', 'red', 'black
 FILL, LINE, SHADOW = 0x02, 0x00, 0x0F
 
 
+def bv_data(rgb555):
+    """the battle windows' small font (btlvwf.s): the glyphs as U_GLY, the inks of BG 4-6 (yellow,
+    label, green)"""
+    out = 'BV_GLY:\n' + ''.join('    db %s\n' % ', '.join(str(v) for v in glyphs()[k:k + 18])
+                                for k in range(0, len(glyphs()), 18))
+    ink = b''.join(bytes([rgb555(INKS[k]) & 255, rgb555(INKS[k]) >> 8]) for k in ('yellow', 'label', 'green'))
+    return out + 'BV_INK:\n    db %s\n' % ', '.join(str(v) for v in ink)
+
+
 def palettes(rom, rgb555):
     """16 palettes x 4 colours as RGB555 (BG 0-7, OBJ 0-7): BG by PAL_ORDER; the icon palette is
     FF3's menu window palette (fix:E1BC, its icons' colours); OBJ 7 the hand"""

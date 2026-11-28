@@ -34,7 +34,10 @@ m_put2:     push hl
 
 ; E codes from HL ($FF ends early? no: $FF is a blank) at column B, row C
 
-menu_vbl:   ld a, [m_dirty]                 ; (1: the map then the attributes, 2: the attributes;
+menu_vbl:   ld a, [bv_on]                   ; (battle: btlvwf.s's tiles and map)
+            and a
+            jp nz, bv_vbl
+            ld a, [m_dirty]                 ; (1: the map then the attributes, 2: the attributes;
             and a                           ;   each copy only while LY 144-150 leaves it time
             ret z                           ;   in this V-Blank, else the next one: Lot Check)
             ldh a, [rSVBK]                  ; (the canvas is WRAM bank 2: the battle runs with 3)
@@ -135,6 +138,14 @@ font_ld:    ld [fnt_vb], a
             ld b, 72
             ld a, [fnt_vb]
             jp vcopyx
+; the battle windows: btlvwf.s bv_vbl9 (the bank written directly, rom_bank put back)
+bv_vbl:     ld a, CODE3
+            ld [$2100], a
+            call bv_vbl9
+            ld a, [rom_bank]
+            ld [$2100], a
+            ret
+
 ; and the world map's tiles back after a full-screen menu
 font_back:  ldh a, [is_world]
             and a

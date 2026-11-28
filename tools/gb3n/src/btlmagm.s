@@ -305,11 +305,9 @@ bmg_spell:   ld [BZ + $18], a
             jp mg_targets
 
 ; the list: two levels a page (the cursor's level first when it is odd)
-bmg_draw:    call cv2
-            ld bc, $0000
+bmg_draw:    ld bc, $0000
             ld de, $140A
-            call b_box
-            call cv3
+            call w_box
             ld a, [MG_ROW]
             and $FE
             ld [btl_k], a
@@ -347,7 +345,7 @@ bmg_draw:    call cv2
             add a, a
             add a, a
             add a, a
-            add a, 64 + 8 - 4
+            add a, 64 + 8
             ld c, a
             ld b, 0
             call b_hand

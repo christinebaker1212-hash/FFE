@@ -59,6 +59,8 @@ btl_loop:   call turn_start                 ; 34/81C3
             ld [W7 + $78BA], a
             jp btl_loop
 .over:      call hp_win                     ; 34/811C
+            ld a, 1                         ; (the end's messages replace each other: no windows
+            ld [msg_keep], a                ;   between them)
             ld a, [W7 + $78D3]
             and 2
             jr nz, .save                    ; (ran away)

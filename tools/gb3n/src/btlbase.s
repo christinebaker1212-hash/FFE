@@ -42,6 +42,13 @@ SCR_TYPES  = SCRIPTS + $68      ; 34/9575: battle message variable types (nibble
 ROWTAB     = BD_2F + $340       ; 34/8739: monster rows by tilemap id (build.py)
 NUM_OAM    = oam_buf + 4 * 24   ; sprites 24-39 (the hand is hidden while actions run)
 ARROW      = $CA
+; the battle windows' strings (btlvwf.s bv_put): flags
+BVF_R      = $08                ; flags: right-aligned
+BVF_C      = $10                ;   centred
+BVP_W      = 7                  ; palettes: white, yellow, label, green
+BVP_Y      = 4
+BVP_L      = 5
+BVP_G      = 6
 BD_CMDS    = BD_2F + $240       ; 34/9B21: 4 battle commands a job (build.py)
 HAND_T     = $60                ; the hand cursor (VRAM bank 1; loaded again after the spells, btlui.s)
 NUM_T      = $40                ; numeral sprite tiles in VRAM bank 1 ($40-$49 digits, $4A-$4C Miss)

@@ -16,6 +16,7 @@ ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
             call font_ld
             call ui_hand
             call menu_pals
+            call bv_init                    ; (btlvwf.s: the small font's windows)
             ld a, BDATA_BANK                ; numeral sprites -> VRAM bank 1 $40-$4C
             ld [vc_src], a
             ld hl, $7000
@@ -24,6 +25,9 @@ ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
             ld a, 1
             call vcopyx
             call msg_reset
+            xor a
+            ld [msg_full], a
+            ld [msg_keep], a
             ld a, PAL_TXT | 8
             ld [m_tattr], a
             ld a, 96
@@ -64,47 +68,51 @@ bstr:       ld l, a
             ld bc, 32
             jp rd_copy
 
-; ---- the party window: lines in BCV_BUF (bank 3 values), then the canvas
-hp_win:     ld hl, BCV_BUF
-            ld de, 80
-            ld a, $FF
-.cl:        ld [hl+], a
-            dec de
-            ld b, a
-            ld a, d
-            or e
-            ld a, b
-            jr nz, .cl
+; ---- the windows as the mock-up (owner's polish pass, 2026-11-28; small font: btlvwf.s): the left
+; window (0, 0, 10, 6) for the commands, the target's name and the action's lines; the party window
+; (10, 0, 10, 6): per member the name (yellow while it chooses or acts) and HP current / maximum
+; (yellow below a quarter, grey when fallen). A battle message covers both (btlmsg.s).
+hp_win:     call bv_clrall                  ; (both windows drawn again: every string gone first)
+            xor a
+            ld [msg_full], a
+            ld bc, $0000
+            ld de, $0A06
+            call w_box
+            ld bc, $0A00
+            ld de, $0A06
+            call w_box
             xor a
 .m:         ld [btl_m], a
-            ld l, a                         ; line = BCV_BUF + 20 m
-            add a, a
-            add a, a
-            add a, l
-            add a, a
-            add a, a
-            ld e, a
-            ld d, 0
-            ld hl, BCV_BUF + 1
-            add hl, de
-            push hl
-            ld a, [btl_m]                   ; name ($6106 + 64 m)
+            call hp_line
+            ld a, [btl_m]
+            inc a
+            cp 4
+            jr nz, .m
+            ret
+
+; member btl_m's line
+hp_line:    ld a, [btl_m]                   ; the name (GS + $106 + 64 m), its blanks after off
             rrca
             rrca
             add a, 6
-            ld e, a
-            ld d, 0
-            ld hl, GS + $100
-            add hl, de
-            pop de
-            push de
-            ld b, 6
-.n:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .n
-            ld a, [btl_m]                   ; hp: $7575 + 64 m + 3
+            ld l, a
+            ld h, high(GS + $100)
+            ld de, btl_str
+            call nm6
+            ld a, [btl_hl]
+            ld b, a
+            ld a, [btl_m]
+            cp b
+            ld e, BVP_W
+            jr nz, .w
+            ld e, BVP_Y
+.w:         inc a
+            ld c, a
+            ld b, 11
+            ld d, 15
+            ld hl, btl_str
+            call bv_put
+            ld a, [btl_m]                   ; HP: $7575 + 64 m + 3 (current, maximum)
             rrca
             rrca
             add a, 3
@@ -116,103 +124,182 @@ hp_win:     ld hl, BCV_BUF
             ld e, a
             ld a, [hl+]
             ld d, a
-            push hl
-            pop bc
-            pop hl
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
             push bc
-            ld bc, 11                       ; current: columns 9-12 (right-aligned at 12)
-            add hl, bc
-            call dec4
+            push de
+            ld hl, btl_str
+            call bnum
             ld [hl], $C7                    ; "/"
             inc hl
-            push hl
-            ld a, [btl_m]                   ; the chosen command, else the maximum
-            ld e, a
-            ld d, 0
-            ld hl, W7 + $78CF
-            add hl, de
-            ld a, [hl]
-            pop hl
-            pop bc
-            cp $FF
-            jr z, .max
-            cp $C8
-            jr nc, .max                     ; (spells: later)
-            push hl
-            add a, $20                      ; command names $0620 +
-            ld b, 2
-            call bstr
             pop de
+            pop bc
+            push de
+            push bc
+            ld d, b
+            ld e, c
+            call bnum
+            ld [hl], 0
+            pop bc                          ; the colour: fallen grey; current x 4 < maximum yellow
+            pop de
+            ld a, [btl_m]
+            rrca
+            rrca
+            inc a
+            push bc
+            ld c, a
+            ld a, $5B
+            call zpy
+            pop bc
+            ld a, [hl]
+            and $C0
+            ld a, BVP_L
+            jr nz, .p
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, e
+            sub c
+            ld a, d
+            sbc b
+            ld a, BVP_W
+            jr nc, .p
+            ld a, BVP_Y
+.p:         or BVF_R
+            ld e, a
+            ld a, [btl_m]
+            inc a
+            ld c, a
+            ld b, 15
+            ld d, 19
             ld hl, btl_str
-            ld b, 5
-.cn:        ld a, [hl+]
-            and a
-            jr z, .nx
+            jp bv_put
+
+; 6 name letters HL -> DE, 0-ended, the blanks after the last letter off
+nm6:        ld b, 6
+            push de
+.c:         ld a, [hl+]
             ld [de], a
             inc de
             dec b
-            jr nz, .cn
-            jr .nx
-.max:       push hl
-            ld h, b
-            ld l, c
-            ld a, [hl+]
-            ld e, a
-            ld d, [hl]
+            jr nz, .c
+            xor a
+            ld [de], a
             pop hl
-            inc hl
-            inc hl
-            inc hl
-            call dec4
-.nx:        ld a, [btl_m]
-            inc a
-            cp 4
-            jp nz, .m
-            call cv2                        ; the canvas: window and lines
-            ld bc, $0000
-            ld de, $1406
+            ld b, 6
+            ld c, 0                         ; C = the length up to the last letter
+.l:         ld a, [hl+]
+            cp $FF
+            jr z, .n
+            ld a, 7
+            sub b
+            ld c, a
+.n:         dec b
+            jr nz, .l
+            ld a, l
+            sub 6
+            ld l, a
+            ld a, h
+            sbc 0
+            ld h, a
+            ld b, 0
+            add hl, bc
+            ld [hl], 0
+            ret
+
+; DE in decimal at HL (no leading zeros), HL after it
+bnum:       xor a
+            ld [bn_f], a
+            ld bc, 10000
+            call .d
+            ld bc, 1000
+            call .d
+            ld bc, 100
+            call .d
+            ld bc, 10
+            call .d
+            ld a, e
+            add a, $80
+            ld [hl+], a
+            ret
+.d:         ld a, $7F
+.l:         inc a
+            push af
+            ld a, e
+            sub c
+            ld e, a
+            ld a, d
+            sbc b
+            ld d, a
+            jr c, .u
+            pop af
+            jr .l
+.u:         ld a, e
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            pop af
+            cp $80
+            jr nz, .w
+            ld a, [bn_f]
+            and a
+            ret z
+            ld a, $80
+.w:         ld [hl+], a
+            ld a, 1
+            ld [bn_f], a
+            ret
+
+; a window at B, C, D x E: frame, inside blank, its strings gone
+w_box:      push bc
+            push de
+            call cv2
             call b_box
-            ld hl, BCV_BUF
-            ld c, 1
-.r:         ld b, 0
-.k:         ld a, [hl+]
+            pop de
+            pop bc
+            push bc
+            push de
+            dec d
+            dec d
+            dec e
+            dec e
+            inc c
+.r:         push bc
+            push de
+            inc b
+.k:         ld a, $FF
             call m_put
             inc b
-            ld a, b
-            cp 20
+            dec d
             jr nz, .k
+            pop de
+            pop bc
             inc c
-            ld a, c
-            cp 5
+            dec e
             jr nz, .r
-            ld bc, $0000                    ; (the frame again: the lines' first / last cells)
-            ld de, $1406
-            call b_box
+            call cv3
+            pop de
+            pop bc
+            ld a, b                         ; the strings on its rows
+            add a, d
+            ld d, a
+            inc c
+            dec e
+            dec e
+.s:         call bv_clr
+            inc c
+            dec e
+            jr nz, .s
             ld a, 1
             ld [m_dirty], a
-            jp cv3
-
-; DE in decimal, right-aligned ending at HL (4 cells, blanks before), HL after it
-dec4:       push hl
-            ld b, 4
-.l:         push bc
-            push hl
-            call b_div10                      ; DE / 10, A = remainder
-            pop hl
-            pop bc
-            add a, $80
-            ld [hl-], a
-            dec b
-            jr z, .x
-            ld a, d
-            or e
-            jr nz, .l
-.x:         pop hl
-            inc hl
             ret
 
 ; ---- the command window (34/9A69): the member's four commands ($7400-$7403; row changes
-; $7404 / $7405 = 2 / 3), names $0620 + id
+; $7404 / $7405 = 2 / 3), names $0620 + id, in the left window from column 2
 cmd_win:    ld a, 2
             ld [W7 + $7404], a
             inc a
@@ -233,12 +320,9 @@ cmd_win:    ld a, 2
             ld bc, 4
             ld a, BDATA_BANK
             call rd_copy
-            ld hl, BCV_BUF                  ; names -> 4 lines of 8
-            ld de, 32
-            ld a, $FF
-.cl:        ld [hl+], a
-            dec e
-            jr nz, .cl
+            ld bc, $0000
+            ld de, $0A06
+            call w_box
             xor a
 .c:         ld [btl_m], a
             ld e, a
@@ -253,52 +337,18 @@ cmd_win:    ld a, 2
             ld b, 2
             call bstr
             ld a, [btl_m]
-            add a, a
-            add a, a
-            add a, a
-            ld e, a
-            ld d, 0
-            ld hl, BCV_BUF
-            add hl, de
-            ld d, h
-            ld e, l
+            inc a
+            ld c, a
+            ld b, 2
+            ld d, 10
+            ld e, BVP_W
             ld hl, btl_str
-            ld b, 8
-.cp:        ld a, [hl+]
-            and a
-            jr z, .cx
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .cp
-.cx:        ld a, [btl_m]
+            call bv_put
+            ld a, [btl_m]
             inc a
             cp 4
             jr nz, .c
-            call cv2
-            ld bc, $0000
-            ld de, $0A06
-            call b_box
-            ld hl, BCV_BUF
-            ld c, 1
-.r:         ld b, 1                         ; (the column before the names blank: the box's
-            ld a, $FF                       ;   inside is not cleared by b_box)
-            call m_put
-            inc b
-.k:         ld a, [hl+]
-            call m_put
-            inc b
-            ld a, b
-            cp 9
-            jr nz, .k
-            inc hl
-            inc c
-            ld a, c
-            cp 5
-            jr nz, .r
-            ld a, 1
-            ld [m_dirty], a
-            jp cv3
+            ret
 
 ; ---- input: new presses with FF3's repeat (as the field menus' m_keys) -> btl_new
 b_keys:     call wait_vbl
@@ -409,6 +459,8 @@ get_actions:
             ld hl, W7 + $7E0F
             add hl, de
             ld [hl], 0
+            ld a, [BZ + $52]                ; (its name yellow while it chooses)
+            ld [btl_hl], a
             call hp_win
             call chr_ofs
             ld a, [BZ + $52]                ; saved defence value back
@@ -488,7 +540,9 @@ get_actions:
             jr .next
 .back:      call b_back
             jr .next
-.done:      ld b, $FF
+.done:      ld a, $FF
+            ld [btl_hl], a
+            ld b, $FF
             jp b_hand
 
 ; 34/9A42: back to the previous member able to choose (else the same one)
@@ -529,7 +583,7 @@ cmd_input:  xor a
             add a, a
             add a, a
             add a, a
-            add a, 104 - 4
+            add a, 104
             ld c, a
             ld b, 0
             call b_hand
@@ -648,7 +702,11 @@ cmd_input:  xor a
             and a
             jp z, .l
             ret
-.tc:        call target_mon
+.tc:        call tg_on
+            call target_mon
+            push af
+            call tg_off
+            pop af
             and a
             ret z
             ld a, [BZ + $5F]
@@ -667,7 +725,11 @@ cmd_input:  xor a
             ret
 .jump:      xor a                           ; 35/A9AB: a monster target
             ld [BZ + $B3], a
+            call tg_on
             call target_sel
+            push af
+            call tg_off
+            pop af
             and a
             jp z, .l
             ld a, [BZ + $B5]
@@ -814,6 +876,7 @@ ts_show:    ld a, [BZ + $AD]
             jr .m
 .m1:        ld a, b
             ld [btl_tgt], a
+            call tg_show
             call mon_cursor
             jp b_hand
 .c:         ld a, [BZ + $AE]
@@ -827,7 +890,16 @@ ts_show:    ld a, [BZ + $AD]
             ret z
             ld a, c
             jr .n
-.n1:        ld a, b                         ; member b: left of its sprite
+.n1:        push bc                         ; (the member's name in the left window; all: "All")
+            ld a, [BZ + $B1]
+            cp 5
+            ld a, $F0
+            jr z, .k
+            ld a, b
+            or $E0
+.k:         call tg_key
+            pop bc
+            ld a, b                         ; member b: left of its sprite
             add a, a
             add a, b
             add a, a
@@ -843,6 +915,96 @@ ts_show:    ld a, [BZ + $AD]
             sub 8 + 16
             ld b, a
             jp b_hand
+
+; the target's window (the mock-up): while a command's target is chosen, the left window shows the
+; monster's name and how many of its kind stand (all: FF3's "All"; a member: empty)
+tg_on:      ld a, 1
+            ld [btl_tw], a
+            ld a, $FF
+            ld [btl_tws], a
+            ret
+tg_off:     xor a
+            ld [btl_tw], a
+            jp cmd_win
+tg_show:    ld a, [BZ + $B1]
+            cp 1
+            ld a, $F0
+            jr z, tg_key
+            ld a, [btl_tgt]
+tg_key:     ld b, a
+            ld a, [btl_tw]
+            and a
+            ret z
+            ld a, [btl_tws]
+            cp b
+            ret z
+            ld a, b
+            ld [btl_tws], a
+            push bc
+            ld bc, $0000
+            ld de, $0A06
+            call w_box
+            pop bc
+            ld a, b
+            cp $F0
+            jr z, .all
+            cp $E0
+            jr c, .m
+            and 3                           ; (a member)
+            call name_of
+            jr .put
+.all:       ld a, b
+            cp $F0
+            jr nz, .m
+            ld a, $36                       ; $0636 All
+            ld b, 2
+            call bstr
+            jr .put
+.m:         or $80
+            call name_of
+            ret nc
+.put:       ld bc, $0101
+            ld d, 10
+            ld e, BVP_W
+            ld hl, btl_str
+            call bv_put
+            ld a, [btl_tws]
+            cp $E0
+            ret nc
+            ld e, a                         ; how many of its kind: $7ECD + slot = the kind,
+            ld d, 0                         ;   $7DA7 + slot $FF: gone
+            ld hl, W7 + $7ECD
+            add hl, de
+            ld b, [hl]
+            ld c, 0
+            ld e, 0
+.k:         ld hl, W7 + $7DA7
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .kn
+            ld hl, W7 + $7ECD
+            add hl, de
+            ld a, [hl]
+            cp b
+            jr nz, .kn
+            inc c
+.kn:        inc e
+            ld a, e
+            cp 8
+            jr nz, .k
+            ld hl, btl_str
+            ld [hl], $BB                    ; "x"
+            inc hl
+            ld e, c
+            ld d, 0
+            call bnum
+            ld [hl], 0
+            ld bc, $0102
+            ld d, 9
+            ld e, BVP_L | BVF_R
+            ld hl, btl_str
+            jp bv_put
 
 ; 32/9B8C: the input; groups refused unless $B3
 ts_input:   ld a, [BZ + $AD]
@@ -1563,6 +1725,14 @@ btl_tgt:    ds 1
 btl_px:     ds 1
 btl_py:     ds 1
 btl_str:    ds 32
+section wram, $DF55                         ; (WRAM 3: after btlmsg.s's)
+btl_tw:     ds 1                            ; the target's window on, the target it shows
+btl_tws:    ds 1
 
 section wram, $C33A                         ; (bank 0 WRAM: free after the wipe's)
 btl_arep:   ds 1
+bv_on:      ds 1                            ; (btlvwf.s: the small-font battle windows on,
+bv_busy:    ds 1                            ;   being drawn, the staged blocks to send, the map
+bv_dirty:   ds 1                            ;   to send, a caller's WRAM bank)
+bv_map:     ds 1
+bv_svk:     ds 1

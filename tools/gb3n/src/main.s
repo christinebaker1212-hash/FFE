@@ -367,7 +367,22 @@ main:       call wait_vbl
             call dlg_show
             jr main
 
-wait_vbl:   xor a
+wait_vbl:   ld a, [bv_on]                   ; (battle: the windows' changed rows in the small
+            and a                           ;   font first, btlvwf.s)
+            jr z, .w0
+            ld a, [m_dirty]
+            and a
+            jr z, .w0
+            push bc
+            push de
+            push hl
+            ld a, CODE3
+            ld hl, bv_conv
+            call far_call
+            pop hl
+            pop de
+            pop bc
+.w0:        xor a
             ldh [vbl_flag], a
 .w:         halt
             ldh a, [vbl_flag]
