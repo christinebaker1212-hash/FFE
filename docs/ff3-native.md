@@ -417,3 +417,21 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   is low on the screen (run at the edge, it held the V-Blank interrupt past the V-Blank). The
   Color-only message moved out of bank 0 (it was full). Mock-ups sent: main menu (FF1's
   arrangement), dialogue box (margin, typed text), battle commands over the HP side.
+- 2026-11-28 (later): from the owner's play:
+  - colour 0 of BG palettes 1-3 is the backdrop, as the NES PPU draws it (`build.py bd_col0`).
+    The stray bytes at $3F04/8/C had shown as green blocks on maps and a green band round the
+    dialogue box.
+  - The main menu's command words were read with an 8-bit pointer step, and the table now crosses
+    a page (Status / Order / Job / Save garbled); `jb_cost` indexed the same way.
+  - The encounter transition draws the whole 16 x 16 metatile ring first (`ring_fill`): its twist
+    and zoom showed stale cells beyond the 12 x 12 view.
+  - The member steps forward for its command and back after (34/9940 / 99FD).
+  - Damage numerals and MISS in FF1's bold digits with a 1-pixel black ring; sprite palette 3 is
+    set for them (the hits' animations leave their colours there).
+  - The prophecy as FF3's (3A/8726): NES-blue screen, lines faded in one by one with FF3's flicker,
+    settling in grey. A, B or START ends it.
+  - Name entry: START with no name types a preset (FF1's lists, read at build time, in four groups
+    with Luneth / Arc / Refia / Ingus).
+  - Mock-ups sent: main menu A / B (small letters only, spaced out) and the battle screen (commands,
+    target, hits narrated in the left window, outlined numbers).
+  - Open: the blue strip behind the party (not reproduced; screenshot asked).

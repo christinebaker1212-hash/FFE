@@ -170,6 +170,10 @@ added: my name entry, FF3's NES map wipes, FF1's encounter transition, typewrite
 targeting, centred target hand, FF3's hopping numerals. Mock-ups sent, waiting: main menu (FF1
 arrangement), dialogue box, battle commands over HP, intro (lines fading in). Next: menus' hand rule
 (after the main menu answer), Options / Bestiary / Sound Test / gradients from FF1.
+FF3, 2026-11-28 (later): map colours (BG colour 0 = backdrop), menu command words, encounter
+transition edges, step forward for commands, outlined numerals, FF3's prophecy (A skips), preset
+names. Waiting on the owner: main menu A / B and battle mock-ups (small letters only), then the
+one-font menu redesign and battle conveyance.
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan
