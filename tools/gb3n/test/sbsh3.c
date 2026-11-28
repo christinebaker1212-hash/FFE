@@ -3,6 +3,7 @@
  * and work RAM bank 1, which the core's bus map does not give back reliably.
  *   R BANK ADDR N   read N bytes of work RAM: $C000-$CFFF bank 0, $D000-$DFFF bank BANK (hex)
  *   P BANK ADDR HEX write the bytes HEX (e.g. 01FF3A) there                -> "ok"
+ *   V BANK ADDR N   read N bytes of video RAM (bank 0 / 1, $8000-$9FFF) (hex)
  * build: gcc -O2 -I/usr/include/libretro-common tools/gb3n/test/sbsh3.c -ldl -o build/sbsh3
  *
  * Interactive headless runner on a libretro Game Boy core (SameBoy by default: the most
@@ -186,6 +187,15 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(cmd, "r")) {
 			unsigned ad = strtoul(a1, 0, 16); int cnt = n > 2 ? atoi(a2) : 1;
 			for (int i = 0; i < cnt; i++) { uint8_t b = 0xFF; rd((ad + i) & 0xFFFF, &b); printf("%02X", b); }
+			printf("\n");
+		} else if (!strcmp(cmd, "V")) {
+			char a3[64] = {0};
+			sscanf(line, "%7s %399s %63s %63s", cmd, a1, a2, a3);
+			uint8_t* vr = (uint8_t*) p_retro_get_memory_data(RETRO_MEMORY_VIDEO_RAM);
+			size_t vl = p_retro_get_memory_size(RETRO_MEMORY_VIDEO_RAM);
+			size_t base = strtoul(a1, 0, 16) * 0x2000 + (strtoul(a2, 0, 16) - 0x8000);
+			int cnt = atoi(a3);
+			for (int i = 0; i < cnt; i++) printf("%02X", vr && base + i < vl ? vr[base + i] : 0xFF);
 			printf("\n");
 		} else if (!strcmp(cmd, "R") || !strcmp(cmd, "P")) {
 			char a3[2048] = {0};

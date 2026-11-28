@@ -206,3 +206,291 @@ f3F_FBEF:   ld b, a
             ret
 .eq:        scf
             ret
+
+; ==== the field: tiles and people (3F/E3F1-E54B). NES $7000 people table -> $C000, the map
+; $7400-$77FF -> $D400, the tile properties $0400 / $0500 -> $C800 / $C900.
+section bank 0, $1400
+; ---- 3F/E4E9 get tile in facing direction: A = direction bits (r l d u) -> X, Y offsets, $84 / $85
+; = the party's position + offset (mod 64); A = $85, the carry from the last ADC
+f3F_E4E9:   srl a
+            jr c, .r
+            srl a
+            jr c, .l
+            srl a
+            jr c, .d
+            ld e, 7                         ; up
+            ld c, 6
+            jr .go
+.d:         ld e, 7
+            ld c, 8
+            jr .go
+.r:         ld e, 8
+            ld c, 7
+            jr .go
+.l:         ld e, 6
+            ld c, 7
+.go:        ld a, [BZ + $29]
+            add e
+            and $3F
+            ld [BZ + $84], a
+            ld a, [BZ + $2A]
+            add c
+            push af
+            and $3F
+            ld [BZ + $85], a
+            ld b, a
+            pop af                          ; (the ADC's carry; AND keeps it on the 6502)
+            ld a, b
+            ret
+
+; ---- 3F/E51C get tile properties: Y = the tile at ($84, $85) (outside 0-31: the fill tile $4C;
+; $80 / $81 = its NES address in $7400-$77FF), $44 / $45 = its properties bytes; A = $45
+f3F_E51C:   push af                         ; (the caller's flags: the off-map path keeps them)
+            ld a, [BZ + $4C]
+            ld c, a
+            ld a, [BZ + $84]
+            ld hl, BZ + $85
+            or [hl]
+            and $20
+            jr nz, .p
+            pop af
+            ld a, [BZ + $85]
+            and $1F
+            srl a
+            srl a
+            srl a
+            or $74
+            ld [BZ + $81], a
+            ld a, [BZ + $85]
+            sla a
+            sla a
+            sla a
+            sla a
+            sla a
+            push af                         ; (the last ASL's carry: ORA keeps it on the 6502)
+            ld hl, BZ + $84
+            or [hl]
+            ld [BZ + $80], a
+            ld l, a
+            ld a, [BZ + $81]
+            add $D4 - $74
+            ld h, a
+            ld c, [hl]
+.p:         ld b, 0                         ; (the flags to return with are on the stack)
+            ld hl, $C800
+            add hl, bc
+            ld a, [hl]
+            ld [BZ + $44], a
+            inc h
+            ld a, [hl]
+            ld [BZ + $45], a
+            ld b, a
+            pop af
+            ld a, b
+            ret
+
+; ---- 3F/E3F1 check if player is touching an npc ($84, $85): the carry set when one blocks
+; (its $700B & 3, $700D = 1); else the carry clear (a person behind a counter: $700D = 1)
+f3F_E3F1:   ld e, 0
+.a:         ld d, high($C000)
+            ld a, e
+            add 6
+            ld l, a
+            ld h, high($C100)               ; ($7106 + X)
+            ld a, [hl]
+            and a
+            jr z, .a1
+            ld a, [BZ + $A5]
+            and a
+            jr z, .a1
+            cp [hl]
+            jr nz, .an
+.a1:        ld l, e
+            ld h, d
+            ld a, [hl]                      ; $7000
+            and a
+            jr z, .an
+            inc l
+            inc l
+            ld a, [BZ + $84]
+            cp [hl]                         ; $7002
+            jr nz, .an
+            inc l
+            ld a, [BZ + $85]
+            cp [hl]
+            jr nz, .an
+            ld a, e
+            add $0B
+            ld l, a
+            ld a, [hl]
+            and 3
+            ld [hl+], a
+            inc l
+            ld a, 1
+            ld [hl], a                      ; $700D
+            scf
+            ret
+.an:        ld a, e
+            add $10
+            ld e, a
+            cp $C0
+            jr c, .a
+            ld e, 0                         ; (the carry clear here: CMP #$C0 with $C0)
+.b:         ld h, high($C000)
+            ld a, [BZ + $A5]
+            and a
+            jr z, .b1
+            ld a, e
+            add 6
+            ld l, a
+            ld h, high($C100)
+            ld a, [hl]
+            and a
+            jr z, .b0
+            ld b, a
+            ld a, [BZ + $A5]
+            cp b
+            jr nz, .bn
+.b0:        ld h, high($C000)
+.b1:        ld l, e
+            ld a, [hl]
+            and a
+            jr z, .bn
+            ld a, e
+            add 8
+            ld l, a
+            bit 7, [hl]                     ; $7008: BMI
+            jr nz, .x1
+            inc l
+            bit 7, [hl]                     ; $7009: BPL
+            jr z, .x0
+            ld a, e                         ; x == $84 and y + 1 == $85
+            add 4
+            ld l, a
+            ld a, [BZ + $84]
+            cp [hl]
+            jr nz, .bn
+            inc l
+            ld a, [hl]
+            inc a
+            and $3F
+            ld b, a
+            ld a, [BZ + $85]
+            cp b
+            jr nz, .bn
+            jr .hit
+.x1:        ld a, e                         ; x + 1 == $84 and y == $85
+            add 4
+            ld l, a
+            ld a, [hl]
+            inc a
+            and $3F
+            ld b, a
+            ld a, [BZ + $84]
+            cp b
+            jr nz, .bn
+            inc l
+            ld a, [BZ + $85]
+            cp [hl]
+            jr nz, .bn
+            jr .hit
+.x0:        ld a, e                         ; x == $84 and y == $85
+            add 4
+            ld l, a
+            ld a, [BZ + $84]
+            cp [hl]
+            jr nz, .bn
+            inc l
+            ld a, [BZ + $85]
+            cp [hl]
+            jr nz, .bn
+.hit:       ld a, e
+            add $0D
+            ld l, a
+            ld a, 1
+            ld [hl], a
+            and a                           ; (CLC)
+            ret
+.bn:        ld a, e
+            add $10
+            ld e, a
+            cp $C0
+            jr c, .b
+            and a                           ; (CLC: A = $C0)
+            ret
+
+; ---- 3F/E494 check npcs ($84, $85): the carry set when a person is there (one not moving by
+; script: $700D |= $80, they face the party); X = its slot
+f3F_E494:   ld e, 0
+.l:         ld a, e
+            add 6
+            ld l, a
+            ld h, high($C100)
+            ld a, [hl]
+            and a
+            jr z, .z
+            cp 3
+            jr z, .z
+            ld a, [BZ + $A5]
+            and a
+            jr z, .z
+            cp [hl]
+            jr nz, .n
+.z:         ld h, high($C000)
+            ld l, e
+            ld a, [hl]
+            and a
+            jr z, .n
+            ld a, e                         ; x + ($7006 >= 8) == $84
+            add 4
+            ld b, a
+            ld a, e
+            add 6
+            ld l, a
+            ld a, [hl]
+            cp 8                            ; (the 6502's carry: >= 8)
+            ccf
+            ld l, b
+            ld a, [hl]
+            adc 0
+            and $3F
+            ld b, a
+            ld a, [BZ + $84]
+            cp b
+            jr nz, .n
+            ld a, e                         ; y + ($7007 >= 8) == $85
+            add 7
+            ld l, a
+            ld a, [hl]
+            cp 8
+            ccf
+            dec l                           ; (DEC: the carry kept)
+            dec l
+            ld a, [hl]
+            adc 0
+            and $3F
+            ld b, a
+            ld a, [BZ + $85]
+            cp b
+            jr nz, .n
+            ld a, e
+            inc a
+            ld l, a
+            ld a, [hl]                      ; $7001 & $30
+            and $30
+            jr nz, .s
+            ld a, e
+            add $0D
+            ld l, a
+            ld a, [hl]
+            or $80
+            ld [hl], a
+.s:         scf
+            ret
+.n:         ld a, e
+            add $10
+            ld e, a
+            cp $C0
+            jr c, .l
+            and a
+            ret

@@ -53,6 +53,8 @@ class Bus(bytearray):
                 n.shift = n.pad
         elif 0x5113 <= a <= 0x5117:
             n.prg_write(a, v)
+        elif a == 0x5105:
+            n.mirror = v
         elif a == 0x5203:
             n.irq_line = v
         elif a == 0x5204:
@@ -68,7 +70,8 @@ class Nes:
         self.nbanks = len(self.prg) // B8
         self.bus = Bus(self)
         self.cpu = MPU(memory=self.bus)
-        self.vram = bytearray(0x800); self.pal = bytearray(0x20)
+        self.vram = bytearray(0x800); self.pal = bytearray(0x20); self.chr = bytearray(0x2000)
+        self.mirror = 0x44                 # MMC5 $5105: $44 vertical (side by side), $50 horizontal
         self.ctrl = self.mask = 0; self.addr = 0; self.latch = 0; self.vbl = False; self.buf = 0
         self.pad = 0; self.shift = 0
         self.irq_line = 0; self.irq_on = False; self.irq_pending = False; self.irq_done = False
@@ -105,7 +108,9 @@ class Nes:
                 a -= 0x10
             return ('p', a)
         if a >= 0x2000:
-            return ('v', (a & 0x3FF) | (0x400 if a & 0x800 else 0))      # horizontal mirroring
+            sel = (a >> 10) & 3                       # nametable 0-3 -> its 1 KB page by $5105
+            page = (self.mirror >> (2 * sel)) & 1
+            return ('v', (a & 0x3FF) | (page << 10))
         return ('c', a)
 
     def ppu_read(self, r):
@@ -119,7 +124,7 @@ class Nes:
                 v = self.pal[o]
             else:
                 v = self.buf
-                self.buf = self.vram[o] if k == 'v' else 0
+                self.buf = self.vram[o] if k == 'v' else self.chr[o]
             self.addr = (self.addr + (32 if self.ctrl & 4 else 1)) & 0x3FFF
             return v
         return 0
@@ -143,6 +148,8 @@ class Nes:
                 self.pal[o] = v
             elif k == 'v':
                 self.vram[o] = v
+            else:
+                self.chr[o] = v
             self.addr = (self.addr + (32 if self.ctrl & 4 else 1)) & 0x3FFF
 
     def in_frame(self):
@@ -212,6 +219,7 @@ class Nes:
         return pickle.dumps({'mem': bytes(self.bus), 'cpu': (c.pc, c.a, c.x, c.y, c.sp, c.p),
                              'banks': list(self.banks), 'ppu': (self.ctrl, self.mask, self.addr, self.latch, self.vbl,
                              self.buf, bytes(self.vram), bytes(self.pal)), 'irq': (self.irq_line, self.irq_on),
+                             'chr': bytes(self.chr), 'mirror': self.mirror,
                              'cyc': self.cyc, 'frame': self.frame_no})
 
     def load_state(self, blob):
@@ -223,6 +231,7 @@ class Nes:
         (self.ctrl, self.mask, self.addr, self.latch, self.vbl, self.buf, v, p) = s['ppu']
         self.vram = bytearray(v); self.pal = bytearray(p)
         self.irq_line, self.irq_on = s['irq']
+        self.chr = bytearray(s.get('chr', bytes(0x2000))); self.mirror = s.get('mirror', 0x44)
         self.cyc = s['cyc']; self.frame_no = s['frame']
 
 
