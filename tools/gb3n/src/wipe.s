@@ -309,7 +309,9 @@ wp_vbl9:    xor a
 .split:     ld a, c                         ; split: the gap [top, bottom) black (the window
             cp b                            ;   from WY = top), the upper half shifted up
             jr nz, .gap
-            call .woff                      ; (no gap: the whole picture)
+            ldh a, [scy]                    ; (no gap: the whole picture, unshifted)
+            ldh [rSCY], a
+            call .woff
             jr .snd
 .gap:       ld a, 72
             sub b

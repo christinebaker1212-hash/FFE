@@ -402,9 +402,15 @@ vblank:     push af
             call nz, pal_up
             ldh a, [scx]
             ldh [rSCX], a
-            ldh a, [scy]
+            ld a, [wp_on]                   ; (a wipe's split sets the upper half's SCY itself:
+            and a                           ;   written here after it, the upper half stood still
+            jr z, .sy                       ;   while the lower slid)
+            ld a, [wp_split]
+            and a
+            jr nz, .nsy
+.sy:        ldh a, [scy]
             ldh [rSCY], a
-            call q_flush
+.nsy:       call q_flush
             call win_vbl
             call menu_vbl
             ld a, [wp_on]
