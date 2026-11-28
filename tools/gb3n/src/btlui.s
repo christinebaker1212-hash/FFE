@@ -281,7 +281,10 @@ cmd_win:    ld a, 2
             call b_box
             ld hl, BCV_BUF
             ld c, 1
-.r:         ld b, 2
+.r:         ld b, 1                         ; (the column before the names blank: the box's
+            ld a, $FF                       ;   inside is not cleared by b_box)
+            call m_put
+            inc b
 .k:         ld a, [hl+]
             call m_put
             inc b

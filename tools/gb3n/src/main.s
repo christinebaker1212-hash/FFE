@@ -371,6 +371,8 @@ vblank:     push af
             push bc
             push de
             push hl
+            ldh a, [rVBK]                   ; (the VRAM bank kept: a copy into bank 1 can be
+            push af                         ;   interrupted; the handler's copies leave bank 0)
             ld a, [s16_on]                  ; (battle magic: 8 x 16 sprites, btlfx.s)
             and a
             jr z, .o8
@@ -407,6 +409,8 @@ vblank:     push af
             ldh a, [vbl_cnt]                ; (a V-Blank count: the cutscenes' pacing)
             inc a
             ldh [vbl_cnt], a
+            pop af
+            ldh [rVBK], a
             pop hl
             pop de
             pop bc
