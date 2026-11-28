@@ -126,6 +126,8 @@ u_mpal:     xor a
             ld a, [hl]
             and $3F
             ld [u_t], a
+            ld a, [u_k]
+            ld [u_pm], a
             call u_mjob
             ld hl, u_k
             inc [hl]
@@ -169,10 +171,10 @@ u_mjob:     ld a, [u_t]
             ld b, 6
             ld a, 1
             call vcopyx
-            ld a, [u_t]                     ; the palette id
+            ld a, [u_t]                     ; the palette id (job 0: by member u_pm)
             and a
             ld hl, U_PFREE
-            ld a, [u_k]
+            ld a, [u_pm]
             jr z, .f
             ld hl, U_PJOB
             ld a, [u_t]
@@ -1177,3 +1179,4 @@ u_pdef:     ds 2
 u_eres:     ds 1
 eqx_lo:     ds 1
 eqx_hi:     ds 1
+u_pm:       ds 1                            ; (u_mjob: the member whose job-0 colours)

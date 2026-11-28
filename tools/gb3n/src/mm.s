@@ -71,7 +71,12 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             jp .re
 .ni:
             cp 6
-            jr z, .old
+            jr nz, .nsv
+            call u_fadeout                  ; Save: rebuilt (svm.s)
+            call svm_save
+            call u_mpal                     ; (the pictures: the files' were shown)
+            jp .re
+.nsv:
             call mn_pick                    ; Magic, Equip, Status, Job: a member first
             jr c, .l
             ld b, a

@@ -159,6 +159,7 @@ def sight_data(rom, rgb555):
 
 
 def code_data(rom, rgb555, group_world, bank):
+    import re
     import menu
     def db(label, data):
         return '%s:\n' % label + ''.join('    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
@@ -206,6 +207,19 @@ def code_data(rom, rgb555, group_world, bank):
     for x in stw: assert x in lab, x
     stw += ['Magic evasion', 'EXP', 'MP']
     src += strtab("U_STW", [text.encode(x) for x in stw])
+    sv = text.decode(text.raw_string(rom, 't8200', 0x4C))  # (the file screen: FF3's $4B-$4D, Yes / No)
+    m = re.match(r'(.*?)\{15:[0-9A-F]+\}(\w+)\{15:[0-9A-F]+\}(\w+)', sv, re.S)
+    assert m, sv
+    src += db('U_SV0', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x4B)))) + b'\0')
+    src += db('U_SV1', text.encode(clean(m.group(1))) + b'\0')
+    src += db('U_YES', text.encode(m.group(2)) + b'\0') + db('U_NO', text.encode(m.group(3)) + b'\0')
+    src += db('U_SV2', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x4D)))) + b'\0')
+    gt = menu.GB_TEXT
+    src += db('U_OFF', text.encode(gt['s_off']) + b'\x01' + text.encode(gt['s_off2']) + b'\0')
+    src += db('U_SUS', text.encode(gt['s_cs1']) + b'\x01' + text.encode(gt['s_cs2']) + b'\0')
+    src += db('U_SPD', text.encode(gt['s_spd']) + b'\0')
+    ng = re.sub(r'\{[^}]*\}', '', text.decode(text.raw_string(rom, 't8200', 0x22))).strip()
+    src += db('U_NEWG', text.encode(ng) + b'\0')
     for k, v in (('U_USE', 's_use'), ('U_SWAP', 's_swap'), ('U_MITEM', 's_item')):
         src += db(k, text.encode(w[v]) + b'\0')          # (the Magic screen: FF3's Use / Swap / Item)
     # (tiles copied by DMA: 16-byte aligned, at the bank's end)

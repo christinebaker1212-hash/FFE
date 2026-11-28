@@ -24,9 +24,18 @@ tl_flow:    call menu_pals                  ; (window palette 7, the font in ban
             ld a, 2
             jr .out
 .nosus:     call tl_prophecy
-.menu:      call tl_load
+.menu:      ld a, CODE11                    ; the file screen (svm.s)
+            ld hl, svm_load
+            call far_call
+            ld a, [u_eres]
             cp 1
             jr z, .out
+            call menu_pals                  ; (New Game: the name entry's own setup)
+            xor a
+            call font_ld
+            call hand_ld
+            ld a, PAL_TXT
+            ld [m_tattr], a
             call tl_names                   ; New Game
             xor a
 .out:       ld [tl_res], a

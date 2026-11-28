@@ -322,6 +322,7 @@ jbm_hov:    ld bc, $0403
             ld [m_dirty], a
             ld a, [jbm_m]
             ld [u_k], a
+            ld [u_pm], a
             ld a, [jb_cur]
             ld [u_t], a
             call u_mjob

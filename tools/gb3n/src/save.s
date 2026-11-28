@@ -156,6 +156,72 @@ sv_valid:   add a, a
             scf
             ret
 
+; ---- for the rebuilt file screen (svm.s, CODE11); SVB: valid, Gil (3), the save count, then for
+; each member: job, level, name (6)
+SVB        = $DFB0              ; (WRAM 2: the menus' bank)
+svx_peek:   ld a, [mgm_t]
+            call sv_valid
+            ld a, 0
+            jr c, .r
+            push hl
+            ld de, $1C                      ; Gil ($601C), the count ($6014)
+            add hl, de
+            ld de, SVB + 1
+            ld bc, 3
+            call memcpy
+            pop hl
+            push hl
+            ld de, $14
+            add hl, de
+            ld a, [hl]
+            ld [SVB + 4], a
+            pop hl
+            inc h                           ; the $6100 block
+            ld de, SVB + 8
+            ld c, 4
+.m:         ld a, [hl]
+            and $3F
+            ld [de], a
+            inc de
+            inc l
+            ld a, [hl]
+            inc a
+            ld [de], a
+            inc de
+            ld a, l
+            add a, 5
+            ld l, a
+            ld b, 6
+.n:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .n
+            ld a, l
+            add a, $40 - 12
+            ld l, a
+            dec c
+            jr nz, .m
+            ld a, 1
+.r:         ld [SVB], a
+            jp sram_off
+; save to file sv_cur (3D/A897's count, 3D/AE5C)
+svx_save:   call sv_count
+            jp sv_write
+; load file mgm_t: u_eres 0 (loaded into the save block), 1 (not valid)
+svx_load:   ld a, 1
+            ld [u_eres], a
+            ld a, [mgm_t]
+            call sv_valid
+            jp c, sram_off
+            ld de, GS
+            ld bc, $400
+            call memcpy
+            call sram_off
+            xor a
+            ld [u_eres], a
+            ret
+
 sram_on:    ld a, 0
             ld [$4000], a
             ld a, $0A
