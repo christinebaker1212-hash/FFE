@@ -75,6 +75,26 @@ dlg_show:   ld a, [z95]                     ; the table's index (port.py: TXT_ID
             call wait_vbl
             jp joy_clear
 
+; nm_v (24 bits) / 10 -> nm_v, A = the remainder
+nm_div10:   ld hl, nm_v + 2
+            ld c, 3
+            xor a
+.l:         ld b, 8                         ; (remainder:byte / 10, a byte at a time, bit by bit)
+            ld e, [hl]
+.b:         sla e
+            rla
+            cp 10
+            jr c, .s
+            sub 10
+            inc e
+.s:         dec b
+            jr nz, .b
+            ld [hl], e
+            dec hl
+            dec c
+            jr nz, .l
+            ret
+
 ; the buttons let go, then any pressed (FF3 3F/ECAB)
 dlg_key:    call dlg_frame
             ldh a, [pad]
@@ -140,8 +160,12 @@ dlg_page:   ld hl, win_buf
             jr z, .pg
             cp $0A
             jr z, .nl
+            cp $02
+            jp z, .item
+            cp $05
+            jp c, .num
             cp $10
-            jr c, .ch                       ; ($02-$04: items / amounts, with the menus)
+            jr c, .ch
             cp $14
             jr c, .name
             cp $18
@@ -180,6 +204,78 @@ dlg_page:   ld hl, win_buf
             call sbank
             pop de
             jr .ch
+.item:      push de                         ; the item found (z BB): its name (names table)
+            push bc
+            ld a, [zBB]
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, txt_tab + 8
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, de
+            add hl, de
+            add hl, de
+            ld a, TXT_IDX
+            call sbank
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+            pop hl
+            ld a, c
+            call sbank
+.il:        ld a, [de]
+            inc de
+            and a
+            jr z, .ie
+            cp $20                          ; (an icon or a letter; the line's codes dropped)
+            jr c, .il
+            ld [hl+], a
+            jr .il
+.ie:        pop bc
+            ld a, [dlg_bank]
+            call sbank
+            pop de
+            jp .ch
+.num:       push de                         ; an amount (z80-z82, 24 bits) in decimal
+            push bc
+            ld a, [z80]
+            ld [nm_v], a
+            ld a, [z81]
+            ld [nm_v + 1], a
+            ld a, [z82]
+            ld [nm_v + 2], a
+            ld de, nm_buf + 8
+            xor a
+            ld [de], a
+.dv:        push hl                         ; (digits backwards)
+            push de
+            call nm_div10
+            pop de
+            pop hl
+            add a, '0'
+            dec de
+            ld [de], a
+            ld a, [nm_v]
+            ld c, a
+            ld a, [nm_v + 1]
+            or c
+            ld c, a
+            ld a, [nm_v + 2]
+            or c
+            jr nz, .dv
+.nc:        ld a, [de]
+            inc de
+            and a
+            jr z, .ne2
+            ld [hl+], a
+            jr .nc
+.ne2:       pop bc
+            pop de
+            jp .ch
 .nl:        ld a, b
             add a, 20
             ld b, a
@@ -399,3 +495,5 @@ tw_acc:     ds 1
 tw_qh:      ds 1
 tw_ql:      ds 1
 tw_qt:      ds 1
+nm_v:       ds 3
+nm_buf:     ds 9

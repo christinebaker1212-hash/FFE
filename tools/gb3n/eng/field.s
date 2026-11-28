@@ -218,7 +218,7 @@ vblank:     push af
             push bc
             push de
             push hl
-            ldh a, [rombank]
+            ldh a, [mapbank]
             push af
             ldh a, [rSVBK]                  ; (the field's bank 2 may be mapped: bank 1 here)
             push af
@@ -251,7 +251,8 @@ vblank:     push af
             pop af
             ldh [rSVBK], a
             pop af
-            call sbank
+            ldh [mapbank], a
+            ld [MBC_BANK], a
             pop hl
             pop de
             pop bc
@@ -616,6 +617,20 @@ load_map:   ld [aa_mode], a
             jr z, .nl
 .npc:       call npc_load
 .nl:
+            ld a, COMMON                    ; this map's encounter rate (3F/E8A5: 39/BE00, off
+            call sbank                      ;   world 0 39/BF00)
+            ld a, [cur_map]
+            ld l, a
+            ld h, high(C_ENCRATE)
+            ld a, [world]
+            and a
+            jr z, .er
+            inc h
+.er:        ld a, [hl]
+            ld [zF8], a
+            ld a, [mrec + 16 + 1]           ; (3A/930B: chests 16-31 hold gil)
+            and $20
+            ld [z49], a
             ld a, [mrec + 16 + 3]           ; the fill tile outside the 32 x 32 (byte 3)
             ld [fill_mt], a
             ld a, [aa_mode]                 ; from the world map: the map's own entry point
@@ -988,8 +1003,17 @@ a_button:   xor a
             ld [ty], a
             call npc_ahead
             jp c, npc_event
+            call chk_tres                   ; (3F/E917: a treasure / a locked door)
+            push af
             ld a, [lay43]
             ld [t44], a
+            pop af
+            ret nc
+            ld [z76], a                     ; (its dialogue: table $82)
+            ld a, $82
+            ld [z95], a
+            xor a
+            ld [z94], a
             ret
 
 ; FF3 execute npc event (3F/E9BB): the npc's trigger script (2C/8200, 2C/8400 off world 0); below
@@ -1051,7 +1075,10 @@ passable:   ld a, [facing]                  ; the tile in facing direction (3F/E
             ld a, [t44]
             bit 7, a
             jr nz, .trig
-.nt:        ld a, [t44]                     ; (3F/E3B4)
+.nt:        ld a, [t44]                     ; (3F/E3A5: an encounter tile: a random battle)
+            bit 6, a
+            call nz, enc_map
+            ld a, [t44]                     ; (3F/E3B4)
             and 7
             jr z, .stairs
             cp 4

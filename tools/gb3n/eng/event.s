@@ -727,3 +727,302 @@ joy_ff3:    ldh a, [pad]                    ; GB: 0 A, 1 B, 2 Select, 3 Start, 4
             ret z
             inc [hl]
             ret
+
+; ---- FF3 get random number (3E/C711): the field's random table, $F5 stepping up or down ($F6 bit 7),
+; $F6 + $A0 each time it wraps
+C_ENCRATE  = $7100          ; COMMON: 39/BE00 encounter rate by map (world 0), 39/BF00 (others)
+C_ENCMAP   = $7300          ; 2E/92F0 battle group by map (world 0), 2E/93F0 (others)
+C_ENCPROB  = $7500          ; 3D/BD78 which of a group's 8 battles (64)
+C_ENCGRP   = $7600          ; 2E/94F0 battle groups (8 battles each)
+zF5        = Z + $F5
+zF6        = Z + $F6
+zF7        = Z + $F7
+zF8        = Z + $F8        ; this map's encounter rate
+
+rnd_fld:    ld a, COMMON
+            call sbank
+            ld a, [zF6]
+            bit 7, a
+            jr nz, .dn
+            ld hl, zF5
+            inc [hl]
+            jr nz, .g
+            jr .w
+.dn:        ld hl, zF5
+            dec [hl]
+            jr nz, .g
+.w:         ld a, [zF6]
+            add a, $A0
+            ld [zF6], a
+.g:         ld a, [zF5]
+            ld l, a
+            ld h, high(C_RND)
+            ld a, [hl]
+            ret
+
+; FF3 check random battle, normal map (3D/BDB9): a random number below the map's rate -> a battle of
+; the map's group (3D/BD4D), the trigger $20
+enc_map:    ld a, [z6C]
+            and a
+            ret nz
+            call rnd_fld
+            ld b, a
+            ld a, [zF8]
+            ld c, a
+            ld a, b
+            cp c
+            ret nc
+            ld a, [cur_map]
+            ld l, a
+            ld h, high(C_ENCMAP)
+            ld a, [world]
+            and a
+            jr z, .w
+            inc h
+.w:         ld a, [hl]
+            call enc_grp
+            ld a, $20
+            ld [zAB], a
+            ret
+; FF3 choose from battle group (3D/BD4D): A = group -> z6A
+enc_grp:    ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, C_ENCGRP
+            add hl, de
+            push hl
+            ld hl, zF7
+            inc [hl]
+            ld l, [hl]
+            ld h, high(C_RND)
+            ld a, [hl]
+            and $3F
+            ld l, a
+            ld h, high(C_ENCPROB)
+            ld e, [hl]
+            ld d, 0
+            pop hl
+            add hl, de
+            ld a, [hl]
+            ld [z6A], a
+            ret
+
+; ---- FF3 check treasures and locked doors (3F/E917): the tile ahead (tx / ty) -> C and A = the
+; dialogue (table $82); a chest opened (tile $7D), its item given (3F/F549)
+C_CHEST    = $5D00          ; COMMON: 01/9C00 chest contents (world 0), 01/9D00 (others)
+C_PRICE    = $7E00          ; 10/9E00 item prices (2 bytes each)
+z49        = Z + $49        ; the map's chests hold gil (map properties byte 1 & $20)
+z80        = Z + $80
+z81        = Z + $81
+z82        = Z + $82
+z8F        = Z + $8F
+zBA        = Z + $BA
+zBB        = Z + $BB        ; the item found (its name: text code $02)
+
+chk_tres:   ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call map_at
+            ld c, a                         ; C = the tile
+            push bc
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call tile_props
+            pop bc
+            ld a, [z44]
+            bit 7, a
+            jr z, .no
+            ld a, c
+            cp $90
+            jr c, .no
+            cp $A0
+            jr c, .lock
+            cp $D0
+            jr c, .no
+            cp $F0
+            jr nc, .no
+            xor a                           ; $D0-$EF: a treasure ($E0-: not a chest, its switch)
+            ld [zBA], a
+            ld a, c
+            cp $E0
+            jr c, .give
+            ld a, $FF
+            ld [zBA], a
+            call tr_sw
+            and [hl]
+            jr nz, .give
+.no:        and a
+            ret
+.lock:      ld a, [SV + $0E]                ; a locked door: a Thief opens it
+            ld e, a
+            ld d, 0
+            ld hl, SV + $100
+            add hl, de
+            ld a, [hl]
+            cp 8
+            ld a, 3                         ; ("Locked.")
+            jr nz, .y
+            ld hl, SV + $21
+            set 6, [hl]
+            ld a, $7A                       ; ("Unlocked by the Thief's ability!")
+.y:         scf
+            ret
+.give:      ld a, $BF                       ; (sound effect $3F)
+            ld [M_SFX], a
+            call tr_give
+            cp $50                          ; ("Can't carry anymore.": nothing changes)
+            jr z, .y
+            ld b, a
+            ld a, [zBA]
+            and a
+            ld a, b
+            jr nz, .y
+            push af                         ; a chest: opened ($7D, drawn: 3F/E6F0)
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            ld a, $7D
+            call map_set
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call q_mt
+            pop af
+            scf
+            ret
+
+; HL = the treasure switch byte, A = its bit (3F/F640: the map's treasure id from T07 $10)
+tr_sw:      ld a, [z45]
+            and $0F
+            ld e, a
+            ld d, 0
+            ld hl, T07 + $10
+            add hl, de
+            ld a, [hl]
+            ld hl, SV + $40
+            ld c, a
+            ld a, [world]
+            and a
+            ld a, c
+            jp z, sw_at
+            push af
+            srl a
+            srl a
+            srl a
+            add a, $20
+            ld e, a
+            ld d, 0
+            add hl, de
+            pop af
+            jp sw_bit
+
+; FF3 give treasure (3F/F549) -> A = the dialogue
+tr_give:    ld a, [z45]
+            and $0F
+            ld e, a
+            ld d, 0
+            ld hl, T07 + $10
+            add hl, de
+            ld a, [hl]
+            ld [z8F], a
+            ld e, a
+            ld a, COMMON
+            call sbank
+            ld hl, C_CHEST                  ; the contents
+            ld a, [world]
+            and a
+            jr z, .w
+            inc h
+.w:         add hl, de
+            ld a, [hl]
+            ld [zBB], a
+            ld c, a
+            ld a, [zBA]
+            and a
+            jr nz, .item
+            ld a, [z49]
+            and a
+            jr nz, .gil
+.item:      ld b, 1                         ; (arrows $4F-$56: 20)
+            ld a, c
+            cp $4F
+            jr c, .q
+            cp $57
+            jr nc, .q
+            ld b, 20
+.q:         ld a, c
+            push bc
+            call inv_find
+            pop bc
+            ld a, $50                       ; (full)
+            ret c
+            ld hl, SV + $C0
+            add hl, de
+            ld [hl], c
+            ld hl, SV + $E0
+            add hl, de
+            ld a, [hl]
+            add a, b
+            cp 99
+            jr c, .m
+            ld a, 99
+.m:         ld [hl], a
+            call tr_sw
+            xor [hl]
+            ld [hl], a
+            ld a, [zBA]
+            and a
+            ld a, $76
+            ret nz
+            ld a, [z8F]
+            cp $E0
+            ld a, $59
+            ret c
+            ld a, $20                       ; (a chest with a battle)
+            ld [zAB], a
+            ld a, [z8F]
+            ld [z6A], a
+            ld a, 2
+            ret
+.gil:       ld l, c                         ; the item's price as gil (10/9E00)
+            ld h, 0
+            add hl, hl
+            ld de, C_PRICE
+            add hl, de
+            ld a, [hl+]
+            ld [z80], a
+            ld a, [hl]
+            ld [z81], a
+            xor a
+            ld [z82], a
+            ld hl, SV + $1C
+            ld a, [z80]
+            add a, [hl]
+            ld [hl+], a
+            ld a, [z81]
+            adc a, [hl]
+            ld [hl+], a
+            ld a, 0
+            adc a, [hl]
+            ld [hl], a
+            cp $98
+            jr c, .sw
+            ld a, $7F
+            ld [SV + $1C], a
+            ld a, $96
+            ld [SV + $1D], a
+            ld a, $98
+            ld [SV + $1E], a
+.sw:        call tr_sw
+            xor [hl]
+            ld [hl], a
+            ld a, 1
+            ret
+

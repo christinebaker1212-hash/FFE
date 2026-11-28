@@ -1467,9 +1467,17 @@ o_freq:     ld a, A_FLO
             add hl, hl
             ld de, snd_ftab
             add hl, de
+            ldh a, [mapbank]                ; (the table in its own bank: B_SNDT)
+            push af
+            ld a, bank(snd_ftab)
+            ldh [mapbank], a
+            ld [MBC5_BANKL], a
             ld e, [hl]
             inc hl
             ld d, [hl]
+            pop af
+            ldh [mapbank], a
+            ld [MBC5_BANKL], a
             ret
 
 ; the triangle (slot 2) to CH3: on while its volume is not 0

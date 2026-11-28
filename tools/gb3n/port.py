@@ -43,6 +43,7 @@ tiles = _load('tiles')
 text = _load('text')
 
 COMMON, CHARS, TSETS, SCRIPT, NPCGFX, MAPREC0, TMAP0 = 100, 101, 102, 103, 104, 108, 114
+SNDT = 99                                        # the sound's period -> frequency table
 ROM_BANKS = 256
 ob = _load('build')                              # the kept battle / sound modules' builder
 KEPT = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s',
@@ -103,6 +104,12 @@ def data_banks(rom):
     c[0x1700:0x1900] = rom.rd(0x00, 0x9400, 512)        # npc id -> graphics id (00/9400, 9500)
     c[0x1900:0x1B00] = rom.rd(0x01, 0xBE00, 512)        # npc speeds (01/BE00, BF00)
     c[0x1B00:0x1D00] = rom.rd(0x2C, 0x8000, 512)        # npc list pointers (2C/8000)
+    c[0x1D00:0x1F00] = rom.rd(0x01, 0x9C00, 512)        # chest contents (01/9C00, 9D00)
+    c[0x3E00:0x4000] = rom.rd(0x10, 0x9E00, 512)        # item prices (10/9E00)
+    c[0x3100:0x3300] = rom.rd(0x39, 0xBE00, 512)        # encounter rates by map (39/BE00, BF00)
+    c[0x3300:0x3500] = rom.rd(0x2E, 0x92F0, 512)        # battle group by map (2E/92F0, 93F0)
+    c[0x3500:0x3540] = rom.rd(0x3D, 0xBD78, 64)         # a group's battle by chance (3D/BD78)
+    c[0x3600:0x3E00] = rom.rd(0x2E, 0x94F0, 0x800)      # battle groups (2E/94F0)
     menut = rom.rd(0x0D, 0xB700, 144 * 16)
     c[0x2000:0x2000 + 144 * 16] = gbt(menut)
     font = [bytes(t) for t in tiles.tileset(fg=3, bg=2)[:128]]   # the window font: ours, FF3's frame
@@ -224,8 +231,8 @@ def main():
            'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, ob.B_TEXT) +
            ''.join('%s = %d\n' % (k, v) for k, v in sorted(vars(ob).items()) if k.startswith('B_') and isinstance(v, int)) +
            ''.join('T_%s = $%04X\n' % (k.upper(), v) for k, v in L.items()) +
-           'section bank 0, $2FB0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X\n' % (
-               L['t8000'], L['t8200'], L['t8400'], L['t8600']) +
+           'section bank 0, $2FB0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X, $%04X\n' % (
+               L['t8000'], L['t8200'], L['t8400'], L['t8600'], L['names8800']) +
            open(os.path.join(ROOT, 'tools', 'gb', 'rt', 'hw.s')).read())
     for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'field.s'):
         src += '\n' + open(os.path.join(HERE, 'eng', f)).read()
@@ -236,7 +243,9 @@ def main():
             assert t.count('section bank 0, ' + a0) == 1
             t = t.replace('section bank 0, ' + a0, 'section bank 0, ' + a1)
         src += '\n' + t
-    src += '\n' + ob.own_data(raw) + '\n' + ob.sound_data()
+    sd = ob.sound_data()                         # (the period table: out of bank 0)
+    assert sd.count('section bank 0, $3000') == 1
+    src += '\n' + ob.own_data(raw) + '\n' + sd.replace('section bank 0, $3000', 'section bank %d, $4000' % SNDT)
     src = ob.expand(src)
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     lines = src.split('\n')
