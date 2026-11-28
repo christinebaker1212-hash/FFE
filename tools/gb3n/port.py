@@ -42,8 +42,12 @@ def _load(name):
 tiles = _load('tiles')
 text = _load('text')
 
-COMMON, CHARS, TSETS, SCRIPT, NPCGFX, MAPREC0, TXT_IDX, TMAP0 = 1, 2, 3, 4, 5, 9, 15, 16
-ROM_BANKS = 128
+COMMON, CHARS, TSETS, SCRIPT, NPCGFX, MAPREC0, TMAP0 = 100, 101, 102, 103, 104, 108, 114
+ROM_BANKS = 256
+ob = _load('build')                              # the kept battle / sound modules' builder
+KEPT = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s',
+        'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s', 'banim.s', 'bsumn.s', 'batfx.s', 'batbk.s', 'sound.s']
+BANK0_MOVE = {'batlib.s': ('$0450', '$1D00'), 'sound.s': ('$1000', '$2200')}
 B8 = data.B8
 
 
@@ -143,12 +147,7 @@ def data_banks(rom):
         banks.setdefault(bank, blank())[off:off + 16 * data.SUBSET_TILES] = gbt(data.subset_tiles(rom, sub))
         sub_at[sub] = (bank, 0x4000 + off)
         off += 16 * data.SUBSET_TILES
-    tb, layout, last = text.banks(bank + 1)
-    banks[TXT_IDX] = tb.pop(bank + 1)
-    for b, blob in tb.items():
-        banks[b] = blob
-    data_banks.txt = layout
-    assert last < ROM_BANKS
+    assert bank < 160
     for cls in range(3):                              # world 0; world 1; worlds 2-4
         for m in range(256):
             p = m + (256 if cls else 0)               # ($3A $9177: maps $100-$1FF off the floating continent)
@@ -178,6 +177,34 @@ def entrances(rom, props):
     return rom.rd(0x10, p, 16)
 
 
+def pack0(src):
+    """bank 0's sections (after the header) packed one after the other: measured first in banks of
+    their own (the same code at $4000: the same sizes), then placed from $0150 in their order"""
+    pat = re.compile(r'^section bank 0, \$([0-9A-Fa-f]{4})\s*(;.*)?$', re.M)
+    secs = [m for m in pat.finditer(src) if int(m.group(1), 16) >= 0x150]
+    trial, k = [], 0
+    out = src
+    for i, m in enumerate(reversed(secs)):
+        n = len(secs) - 1 - i
+        out = out[:m.start()] + 'section bank %d, $4000' % (300 + n) + out[m.end():]
+    import asm_sm83
+    keep = asm_sm83.AsmError
+    r = asm(out)
+    at = 0x150
+    addr = []
+    for n, m in enumerate(secs):
+        a0 = int(m.group(1), 16)
+        al = 0x100 if a0 & 0xFF == 0 and a0 >= 0x1000 else 1
+        at = (at + al - 1) // al * al
+        addr.append(at)
+        at += len(r.banks.get(300 + n, b''))
+    assert at <= 0x4000, 'bank 0 overflow: $%04X' % at
+    for n, m in reversed(list(enumerate(secs))):
+        src = src[:m.start()] + 'section bank 0, $%04X' % addr[n] + src[m.end():]
+    print('bank 0: $%04X used' % at)
+    return src
+
+
 def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff3_en.nes')
@@ -185,7 +212,8 @@ def main():
     st = (a[a.index('--start') + 1] if '--start' in a else 'new').split(',')
     rom = data.Rom(nes)
     dbanks = data_banks(rom)
-    L = data_banks.txt
+    raw = open(nes, 'rb').read()
+    tbanks, L, tlast = text.banks(ob.B_TEXT)        # (the text: the kept modules' layout)
     if st == ['new']:                                # a new game: map 0, FF3's program start
         st = ['0', '0', '0', '0']; aa = 0
     else:
@@ -193,23 +221,35 @@ def main():
     src = ('START_MAP = %s\nSTART_WORLD = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
            'START_AA = $%02X\n' % aa +
            'COMMON = %d\nCHARS = %d\nTSETS = %d\nMAPREC0 = %d\n' % (COMMON, CHARS, TSETS, MAPREC0) +
-           'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, TXT_IDX) +
-           'section bank 0, $3FF0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X\n' % (
+           'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, ob.B_TEXT) +
+           ''.join('%s = %d\n' % (k, v) for k, v in sorted(vars(ob).items()) if k.startswith('B_') and isinstance(v, int)) +
+           ''.join('T_%s = $%04X\n' % (k.upper(), v) for k, v in L.items()) +
+           'section bank 0, $2FB0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X\n' % (
                L['t8000'], L['t8200'], L['t8400'], L['t8600']) +
            open(os.path.join(ROOT, 'tools', 'gb', 'rt', 'hw.s')).read())
-    for f in ('event.s', 'npc.s', 'dlg.s', 'field.s'):
+    for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'field.s'):
         src += '\n' + open(os.path.join(HERE, 'eng', f)).read()
+    for f in KEPT:                               # FF3's battle rules / screen and sound driver (kept)
+        t = open(os.path.join(HERE, 'src', f)).read()
+        if f in BANK0_MOVE:
+            a0, a1 = BANK0_MOVE[f]
+            assert t.count('section bank 0, ' + a0) == 1
+            t = t.replace('section bank 0, ' + a0, 'section bank 0, ' + a1)
+        src += '\n' + t
+    src += '\n' + ob.own_data(raw) + '\n' + ob.sound_data()
+    src = ob.expand(src)
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     lines = src.split('\n')
     src = '\n'.join([l for l in lines if is_def(l)] + [l for l in lines if not is_def(l)])
-    r = asm(src)
+    r = asm(pack0(src))
     for lbl in ('oam_buf', 'qbuf'):
         assert r.labels[lbl] % 0x100 == 0, '%s not aligned' % lbl
     banks = dict(r.banks)
     for b, blob in dbanks.items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
-    img = make_rom(banks, 'FF3 GBC', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=0x03,
+    ob.post_data(rom, r, banks, tbanks)          # (the kept modules' data: battle, sound, text)
+    img = make_rom(banks, 'FF3 GBC', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=ob.RAM_CODE,
                    sgb=False, cgb=0xC0)
     open(out, 'wb').write(img)
     open(out[:-4] + '.sym', 'w').write(r.sym_file())

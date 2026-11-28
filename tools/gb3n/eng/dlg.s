@@ -21,7 +21,7 @@ F_B        = $16
 F_DR       = $17
 F_SP       = $20            ; (the blank: our font's space, the window colour)
 
-section bank 0, $2600
+section bank 0, $1A00
 
 ; FF3 show dialogue: z76 = id in table z95 ($80 / $82 / $84 / $86); z7D: the last page waits for A
 dlg_show:   ld a, [z95]                     ; the table's index (port.py: TXT_IDX + 3 x id)
@@ -95,6 +95,7 @@ joy_clear:  xor a
 
 ; a frame with the box: the typing, the objects under it hidden, the pad
 dlg_frame:  call wait_vbl
+            call snd_frame
             call read_pad
             call tw_step
             ld hl, oam_buf + 16             ; (the npcs: hidden while over the box)
@@ -167,7 +168,7 @@ dlg_page:   ld hl, win_buf
             jr z, .ne
             push hl
             ld l, a
-            ld h, high(C_FF3ASC)
+            ld h, high(C_ASC)
             ld a, COMMON
             call sbank
             ld a, [hl]
@@ -374,6 +375,9 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 63): the window hidden from line 64, in H-Blank (FF1's: WX, not LCDC)
 stat_int:   push af
+            ldh a, [bmode]                  ; (a battle: its own STAT work: bridge.s)
+            and a
+            jp nz, stat_b
 .hb:        ldh a, [rSTAT]
             and 3
             jr nz, .hb

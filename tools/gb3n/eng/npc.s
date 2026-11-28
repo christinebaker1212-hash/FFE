@@ -11,12 +11,12 @@
 
 C_NPCANIM  = $5400          ; COMMON: 3B/B41A npc animation data (256)
 C_RND      = $5500          ; 3F/FE00 the random number table (256)
-C_FF3ASC   = $5600          ; FF3's letters -> our font
+C_ASC   = $5600          ; FF3's letters -> our font
 C_NPCGID   = $5700          ; 00/9400 npc id -> graphics id (256), world 2+: 00/9500
 C_NPCSPD   = $5900          ; 01/BE00 npc speeds (world 0), 01/BF00 the others
 C_NPCPTR   = $5B00          ; 2C/8000 npc list pointers (512, NES addresses)
 
-section bank 0, $1800
+section bank 0, $1200
 
 ; ---- FF3 load npcs (3B/B2FD): the map's npc list (map properties byte 4) into the objects
 npc_load:   ld hl, O0                       ; (FF3 clears $7000-$70FF)

@@ -46,7 +46,7 @@ zAB        = Z + $AB        ; the trigger stepped on
 zF0        = Z + $F0        ; frame counter
 zF4        = Z + $F4        ; random number index (npcs)
 
-section bank 0, $1000
+section bank 0, $0D00
 
 ; ---- FF3 execute event (3E/C72C): A = event id -> the script pointer (2C/8600), running
 ev_start:   ld l, a
@@ -191,7 +191,7 @@ ev_tab:     dw ev_nop, ev_nop, ev_nop, ev_nop               ; $D0-$D3 shake, fla
             dw ev_nop, ev_nop, ev_nop, ev_nop               ; $EC-$EF
             dw ev_f0, ev_f1, ev_f2, ev_f3                   ; $F0-$F3
             dw ev_f4, ev_f5, ev_f6, ev_f7                   ; $F4-$F7
-            dw ev_nop, ev_f9, ev_fa, ev_fb                  ; $F8-$FB
+            dw ev_f8, ev_f9, ev_fa, ev_fb                   ; $F8-$FB
             dw ev_fc, ev_fd, ev_nop, ev_ff                  ; $FC-$FF
 
 ev_nop:     ret
@@ -502,6 +502,33 @@ ev_f7:      ld a, [z71]
             ld [zAB], a
             ld a, $40
             ld [z44], a
+            ret
+
+; $F8 nn: a song / sound effect (3B/B71C): $00-$7C play song nn, $7D fade out, $7E resume, $7F
+; stop, $80+ sound effect nn
+ev_f8:      ld a, [z71]
+            bit 7, a
+            jr nz, .sfx
+            cp $7D
+            jr c, .song
+            ld b, $0C
+            jr z, .c                        ; ($7D: song $37, fade)
+            cp $7E
+            ld b, 2
+            jr z, .c
+            ld b, 4
+.c:         ld a, b
+            ld [M_CTRL], a
+            cp $0C
+            ret nz
+            ld a, $37
+            ld [M_SONG], a
+            ret
+.song:      ld [M_SONG], a
+            ld a, 1
+            ld [M_CTRL], a
+            ret
+.sfx:       ld [M_SFX], a
             ret
 
 ; $F9 nn: exit nn to the world map; $FA nn: entrance to map nn; $FB nn: the map's entrance nn

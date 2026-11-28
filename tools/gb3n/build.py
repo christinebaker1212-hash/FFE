@@ -654,7 +654,20 @@ ms_weak:    call bs_bossin2
             else:
                 if len(run) >= 32: print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
                 run = []
-    rom = data.Rom(nes)
+    post_data(data.Rom(nes), r, banks, tbanks, cut_raw, cut_gfx)
+    img = make_rom(banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS,
+                   ram_size_code=RAM_CODE, sgb=False, cgb=0xC0)
+    check_header(img)
+    open(out, 'wb').write(img)
+    base = os.path.splitext(out)[0]
+    open(base + '.sym', 'w').write(r.sym_file())
+    print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
+
+
+def post_data(rom, r, banks, tbanks, cut_raw=None, cut_gfx=None, field=True):
+    """the data banks made after the code is assembled (ROM tables patched in at their labels, the
+    cutscenes', world sprites', minimap's, battle animations' and summons' banks, the text, the field's
+    banks); shared with the native port's builder (port.py)"""
     for name, (nb, addr, n) in ROMDATA.items():
         if name not in r.labels: continue
         gb, ga = r.label_bank[name], r.labels[name]
@@ -662,25 +675,28 @@ ms_weak:    call bs_bossin2
         banks[gb] = bytearray(banks[gb])
         v = rom.rd(nb, addr, n)
         banks[gb][off:off + n] = bytes([v]) if isinstance(v, int) else v
-    cb = bytearray(banks[B_CUT]) + bytearray(0x4000 - len(banks[B_CUT]))
-    assert not any(r.claimed.get((B_CUT, o)) for o in range(0x2000)), 'cut code below $6000'
-    cb[0:0x2000] = cut_raw; banks[B_CUT] = cb            # NES bank $1F under the cutscene code
-    assert B_CUTG not in banks; banks[B_CUTG] = cut_gfx
-    wb = bytearray(banks[B_WSPR]) + bytearray(0x4000 - len(banks[B_WSPR]))   # world-map sprites:
-    assert not any(r.claimed.get((B_WSPR, o)) for o in range(0x1D00))      #   3D/BDE0's loads
-    rd = lambda b8, a, n: rom.rd(b8, a, n)
-    base = rd(0x0B, 0x8700, 0x100) + rd(0x0B, 0x9E80, 0x80) + rd(0x0B, 0x9900, 0x80)
-    for k, mid in enumerate((rd(0x0B, 0x9500, 0x200), rd(0x0B, 0x9700, 0x200),
-                             rd(0x0B, 0x9980, 0x100) + rd(0x0B, 0x9F00, 0x100))):
-        t = base + mid + rd(0x0B, 0x9A80, 0x400)
-        wb[0x800 * k:0x800 * k + 0x800] = b''.join(tiles.gb(t[16 * i:16 * i + 16]) for i in range(128))
-    wb[0x1800:0x1D00] = rd(0x3C, 0x8300, 0x500)                       # bank $3C's sprite lists
-    banks[B_WSPR] = wb
-    import minimap                               # the minimap's screen data
-    mb = bytearray(banks.get(B_MINI, b'')) + bytearray(0x4000 - len(banks.get(B_MINI, b'')))
-    assert not any(r.claimed.get((B_MINI, o)) for o in range(0x2000))
-    mb[0:0x2000] = minimap.gb_bank(rom)
-    banks[B_MINI] = mb
+    if cut_raw is not None:
+        cb = bytearray(banks[B_CUT]) + bytearray(0x4000 - len(banks[B_CUT]))
+        assert not any(r.claimed.get((B_CUT, o)) for o in range(0x2000)), 'cut code below $6000'
+        cb[0:0x2000] = cut_raw; banks[B_CUT] = cb            # NES bank $1F under the cutscene code
+        assert B_CUTG not in banks; banks[B_CUTG] = cut_gfx
+    if B_WSPR in banks:
+        wb = bytearray(banks[B_WSPR]) + bytearray(0x4000 - len(banks[B_WSPR]))   # world-map sprites:
+        assert not any(r.claimed.get((B_WSPR, o)) for o in range(0x1D00))      #   3D/BDE0's loads
+        rd = lambda b8, a, n: rom.rd(b8, a, n)
+        base = rd(0x0B, 0x8700, 0x100) + rd(0x0B, 0x9E80, 0x80) + rd(0x0B, 0x9900, 0x80)
+        for k, mid in enumerate((rd(0x0B, 0x9500, 0x200), rd(0x0B, 0x9700, 0x200),
+                                 rd(0x0B, 0x9980, 0x100) + rd(0x0B, 0x9F00, 0x100))):
+            t = base + mid + rd(0x0B, 0x9A80, 0x400)
+            wb[0x800 * k:0x800 * k + 0x800] = b''.join(tiles.gb(t[16 * i:16 * i + 16]) for i in range(128))
+        wb[0x1800:0x1D00] = rd(0x3C, 0x8300, 0x500)                       # bank $3C's sprite lists
+        banks[B_WSPR] = wb
+    if B_MINI in banks:
+        import minimap                           # the minimap's screen data
+        mb = bytearray(banks.get(B_MINI, b'')) + bytearray(0x4000 - len(banks.get(B_MINI, b'')))
+        assert not any(r.claimed.get((B_MINI, o)) for o in range(0x2000))
+        mb[0:0x2000] = minimap.gb_bank(rom)
+        banks[B_MINI] = mb
     ab = bytearray(b"".join(tiles.gb(t) for t in (rom.rd(0x2B, 0xB000 + 16 * i, 16) for i in range(256)))) + bytearray(0x3000)
     at, an = bytearray(), bytearray()               # 33/BEB2's animation graphics sets: tiles from
     for k in range(18):                             #   $1000, the table at $0F00 (offset, OBJ tile, count)
@@ -733,16 +749,10 @@ ms_weak:    call bs_bossin2
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
-    for k, v in field_banks(rom).items():
-        assert k not in banks, 'bank %d used twice' % k
-        banks[k] = v
-    img = make_rom(banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS,
-                   ram_size_code=RAM_CODE, sgb=False, cgb=0xC0)
-    check_header(img)
-    open(out, 'wb').write(img)
-    base = os.path.splitext(out)[0]
-    open(base + '.sym', 'w').write(r.sym_file())
-    print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
+    if field:
+        for k, v in field_banks(rom).items():
+            assert k not in banks, 'bank %d used twice' % k
+            banks[k] = v
 
 
 def check_header(rom):

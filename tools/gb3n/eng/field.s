@@ -142,6 +142,7 @@ start:      di
             dec b
             jr nz, .dc
             call sv_init                    ; a new game's save page (FF3 init sram)
+            call snd_init                   ; FF3's sound driver (sound.s)
             ld a, COMMON                    ; the window font (VRAM bank 1, tile = code)
             call sbank
             ld a, 1
@@ -182,6 +183,7 @@ start:      di
 
 ; ---- main loop: FF3 map main (3F/E1E1), one engine frame per GB frame
 main:       call wait_vbl
+            call snd_frame
             call read_pad
             ld hl, zF0
             inc [hl]
@@ -210,6 +212,9 @@ main:       call wait_vbl
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles (FF1's handler, Color only)
 vblank:     push af
+            ldh a, [bmode]                  ; (a battle: its own V-Blank work: bridge.s)
+            and a
+            jp nz, vbl_b
             push bc
             push de
             push hl
@@ -347,15 +352,19 @@ read_btn:   ld a, $10
             pop af
             ret
 
-wait_vbl:   ldh a, [rLCDC]
-            bit 7, a
+wait_vbl:   ldh a, [rLCDC]                  ; (the check and the halt with interrupts off: a
+            bit 7, a                        ;   V-Blank between them never costs a frame)
             ret z
             xor a
             ldh [vbl_done], a
-.w:         halt
+.w:         di
             ldh a, [vbl_done]
             and a
-            jr z, .w
+            jr nz, .d
+            ei
+            halt
+            jr .w
+.d:         ei
             ret
 
 ; ---- FF3 init sram (3A/8E76): a new game's save page from the ROM's tables
@@ -621,6 +630,16 @@ load_map:   ld [aa_mode], a
             ld a, 4                         ; facing down (3F/E861)
             ld [facing], a
 .pos:       call load_gfx                   ; (3E/DD0F)
+            ld a, COMMON                    ; (the window font again: a battle uses VRAM bank 1)
+            call sbank
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, C_FONT
+            ld de, $9000
+            ld bc, 128 * 16
+            call memcpy
+            xor a
+            ldh [rVBK], a
             call npc_gfx
             call load_pal                   ; (3A/8509)
             ld a, [px]                      ; the tile under the party: its z-level and layer
@@ -656,7 +675,13 @@ load_map:   ld [aa_mode], a
             ldh a, [scy]
             ldh [rSCY], a
             call make_oam
-            ld a, LCDC_ON
+            ld a, [mrec + 16 + 10]          ; the map's song (3F/E8CE: property byte 10)
+            bit 7, a
+            jr nz, .ns                      ; (a conditional song: with its script)
+            ld [M_SONG], a
+            ld a, 1
+            ld [M_CTRL], a
+.ns:        ld a, LCDC_ON
             jp lcd_on
 
 ; FF3 init trigger (3A/9197 / 91C8): every tile $60-$63 / $70-$7C in the map becomes its numbered
@@ -1185,7 +1210,14 @@ do_trigger: ld a, [trig]
             jr z, .entr
             cp $40
             jr z, .back
-            ret                             ; ($C0: the world map, $20 a battle: with them)
+            cp $20
+            jr z, .bat
+            ret                             ; ($C0: the world map: with it)
+.bat:       ld a, [z6A]                     ; a battle (3F/E26E)
+            call battle_run
+            ld a, $FF
+            ld [z4B], a
+            ret
 .entr:      ld a, [ms_n]
             cp MS_MAX
             ret nc
@@ -1658,6 +1690,7 @@ lcd_on:     push af
 
 ; ---- banks
 sbank:      ldh [rombank], a
+            ldh [mapbank], a
             ld [MBC_BANK], a
             ret
 bank_call:  push af
