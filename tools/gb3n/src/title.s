@@ -147,6 +147,7 @@ tl_ask:     push hl
 ; the next one fades in; a page follows the last line at once (FF3 cuts). A, B or START ends the
 ; prophecy (owner). CGB palettes 4 / 5 / 6 = hidden / fading / shown (menu_pals put back after).
 PR_HID     = 4
+PR_BUF     = $D800                 ; (WRAM 2: free at the title)
 PR_FADE    = 5
 PR_DONE    = 6
 pr_prev    = xtr_k                      ; (the encounter transition's bytes: free at the title)
@@ -176,9 +177,14 @@ tl_prophecy: ld a, 1                        ; song 1 (3A/8798)
             ld a, $10
             ld hl, pal_sh + 8 * PR_DONE + 6
             call pr_set
-            ld a, low(TL_PRO)
+            ld hl, TL_PRO                   ; (the pages: bank CODE10 -> WRAM 2 PR_BUF)
+            ld de, PR_BUF
+            ld bc, TL_PRO_END - TL_PRO
+            ld a, CODE10
+            call rd_copy
+            ld a, low(PR_BUF)
             ld [tl_ptr], a
-            ld a, high(TL_PRO)
+            ld a, high(PR_BUF)
             ld [tl_ptr + 1], a
 .page:      call m_clear
             ld hl, MC_ATTR                  ; (every cell hidden-blue)

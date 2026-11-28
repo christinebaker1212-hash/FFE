@@ -68,10 +68,6 @@ def code_data(rom):
         for k in range(0, len(data), 16):
             out += '    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
         return out
-    pro = bytearray()
-    for pg in prophecy_pages(rom):
-        pro += text.encode('\n'.join(pg)) + b'\x0B'
-    pro[-1] = 0
     ng = text.decode(text.raw_string(rom, 't8200', 0x22))
     ng = re.sub(r'\{[^}]*\}', '', ng).strip()
     tail = '0123456789' + ".,'-!?&/:"
@@ -79,10 +75,20 @@ def code_data(rom):
     g1 = text.encode('abcdefghijklmnopqrstuvwxyz' + tail)
     assert len(g0) == len(g1) == 45
     job = text.encode(re.sub(r'\{[^}]*\}', '', text.decode(text.raw_string(rom, 't8200', 0xE2))).strip())
-    return (db('TL_PRO', pro) + db('TL_G0', g0) + db('TL_G1', g1) +
+    return (db('TL_G0', g0) + db('TL_G1', g1) +
             db('TL_H0', text.encode('SELECT: abc')) + db('TL_H1', text.encode('SELECT: ABC')) +
             db('TL_H2', text.encode('B:Delete  START:OK')) + db('TL_JOB', job) +
             'TL_JOBE:\n' + db('s_newgame', text.encode(ng) + b'\0') )
+
+
+def pro_data(rom):
+    """the prophecy pages (TL_PRO .. TL_PRO_END; bank CODE10, copied to WRAM by tl_prophecy)"""
+    pro = bytearray()
+    for pg in prophecy_pages(rom):
+        pro += text.encode('\n'.join(pg)) + b'\x0B'
+    pro[-1] = 0
+    return 'TL_PRO:\n' + ''.join('    db %s\n' % ', '.join(str(v) for v in pro[k:k + 16])
+                                  for k in range(0, len(pro), 16)) + 'TL_PRO_END:\n'
 
 
 def presets():

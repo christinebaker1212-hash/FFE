@@ -250,6 +250,8 @@ it_use:     ld a, [it_cur]
             and a
             ret z                           ; (count 0)
             ld a, [it_id]
+            cp $C8                          ; a spell (3D/A15F): given to a member to learn
+            jp nc, it_spell
             cp $A6
             jr c, .cant                     ; (before the potion: not usable; Midgard Bread later)
             cp $B1
@@ -286,6 +288,60 @@ it_use:     ld a, [it_cur]
             dec b
             jr nz, .w
 .back:      ret
+
+; 3D/A15F: a spell from the bag: "Give to whom?"; the member learns it unless they have it
+; ("Already has that!") or its level holds three ("Can't carry anymore."); FF3 asks no job
+; (the job decides casting, the Magic menu)
+it_spell:   ld a, $73
+            ld [it_prompt], a
+.again:     call it_party
+            call sel_member2
+            ret c
+            rrca
+            rrca
+            ld [mg_caster], a
+            ld a, [it_id]
+            sub $C8
+            call spl_bit                    ; HL = the level byte, B = the bit
+            ld a, [hl]
+            and b
+            ld a, $75                       ; "Already has that!"
+            jr nz, .no
+            ld a, [hl]                      ; three already at this level?
+            ld c, 0
+            ld d, 8
+.cnt:       rrca
+            jr nc, .z
+            inc c
+.z:         dec d
+            jr nz, .cnt
+            ld a, c
+            cp 3
+            ld a, $74                       ; "Can't carry anymore."
+            jr nc, .no
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, $A3                       ; (the learn sound: FF3's confirm)
+            ld [S49], a
+            ld a, [it_cur]                  ; one fewer (3D/A33C)
+            add a, low(GS + $E0)
+            ld l, a
+            ld h, high(GS + $E0)
+            dec [hl]
+            jr nz, .ok
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+.ok:        call it_party
+            ld b, 30
+.w:         call wait_vbl
+            dec b
+            jr nz, .w
+            ret
+.no:        call m_msgbox
+            jr .again
 
 ; the target screen (S2): prompt (rows 0-3), the list around the item, the party (rows 11-17)
 it_party:   call m_clear

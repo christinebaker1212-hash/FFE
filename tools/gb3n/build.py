@@ -365,6 +365,7 @@ def engine_src(rom=None):
         import soundtest
         codes.append(soundtest.code_data(rom))
         codes.append(title.presets())
+        codes.append(title.pro_data(rom))
     codes.append('section bank %d, $5180\nwp_attr:\n    ds 576, $07' % CODE6)  # (wipe.s: the window's
                                         # attributes, palette 7; DMA source: 16-aligned, ends $53C0)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
