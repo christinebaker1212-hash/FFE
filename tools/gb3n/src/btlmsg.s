@@ -576,6 +576,10 @@ num_hop:    ld hl, NUM_OAM                  ; (the resting lines: btl_spr)
             and a
             jr z, .sn                       ; (unused)
             sub b
+            jr c, .tp
+            cp 16 + 1
+            jr nc, .sn
+.tp:        ld a, 16 + 1                    ; (not over the screen's top)
 .sn:        ld [hl+], a
             inc hl
             inc hl
